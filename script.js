@@ -470,45 +470,48 @@ async function syncToGoogleDrive(fileData) {
         const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
         zip.file(`${fileData.name}.xlsx`, excelBuffer);
 
-        // 2. Generate ZIP sebagai blob, lalu konversi ke base64
+       // 2. Generate ZIP sebagai blob, lalu konversi ke base64 (Ini perlu dijadikan await)
         const zipBlob = await zip.generateAsync({ type: "blob" });
-        const reader = new FileReader();
-        reader.readAsDataURL(zipBlob);
-        reader.onloadend = function() {
-            const base64data = reader.result;
-            // Hapus header data URL (misal: "data:application/zip;base64,")
-            const zipBase64 = base64data.split(',')[1]; 
 
-            // 3. Kirim data ke Google Apps Script
-            const payload = {
-                fileName: fileData.name,
-                zipFile: zipBase64
+        // Menggunakan Promise untuk menunggu FileReader selesai
+        const zipBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(zipBlob);
+            reader.onloadend = () => {
+                const base64data = reader.result;
+                resolve(base64data.split(',')[1]); 
             };
+            reader.onerror = reject;
+        });
 
-            console.log("Mengirim data ke Google Apps Script...");
-            fetch(GAS_WEB_APP_URL, {
-                method: 'POST',
-                body: JSON.stringify(payload),
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' } // Apps Script V8 runtime lebih baik dengan text/plain
-            })
-            .then(res => res.json())
-            .then(response => {
-                if (response.success) {
-                    console.log('Upload berhasil!', response.message);
-                    alert('Sinkronisasi ke Google Drive berhasil!');
-                } else {
-                    throw new Error(response.message);
-                }
-            })
-            .catch(error => {
-                console.error('Error saat sinkronisasi:', error);
-                alert('Gagal sinkronisasi ke Google Drive. Error: ' + error.message);
-            });
+        // 3. Kirim data ke Google Apps Script
+        const payload = {
+            fileName: fileData.name,
+            zipFile: zipBase64
         };
 
+        console.log("Mengirim data ke Google Apps Script...");
+        const res = await fetch(GAS_WEB_APP_URL, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+        });
+
+        const response = await res.json();
+
+        if (response.success) {
+            console.log('Upload berhasil!', response.message);
+            // Notifikasi gabungan yang baru
+            alert(`Data berhasil disimpan secara lokal DAN Sinkronisasi ke Google Drive berhasil!`); 
+        } else {
+            // LEMPARKAN ERROR agar ditangkap oleh 'catch' di saveData()
+            throw new Error(response.message || 'Respons Apps Script tidak sukses.');
+        }
+
     } catch (error) {
-        console.error("Gagal membuat file ZIP:", error);
-        alert("Gagal mempersiapkan file untuk diunggah.");
+        // Jika ada error (ZIP atau Fetch gagal), lempar ke pemanggil (saveData)
+        console.error("Gagal membuat atau mengirim file ZIP:", error);
+        throw new Error(`Gagal memproses file. Detail: ${error.message}`); 
     }
 }
     
