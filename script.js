@@ -37,6 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
         modalBody: document.getElementById('modal-body'),
         modalConfirmBtn: document.getElementById('modal-confirm-btn'),
         modalCancelBtn: document.getElementById('modal-cancel-btn'),
+    
+       // TAMBAHAN BARU UNTUK OVERLAY
+        loadingOverlay: document.getElementById('loading-overlay'), 
     };
 
     // =========================================================================
@@ -381,7 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-// GANTI FUNGSI saveData() ANDA DENGAN KODE BERIKUT INI:
+// GANTI FUNGSI saveData() ANDA (YANG LAMA) DENGAN KODE BERIKUT INI:
 
 async function saveData() {
     const now = new Date();
@@ -416,9 +419,9 @@ async function saveData() {
     existingData.push(fileData);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData));
     
-    // HILANGKAN ALERT PERTAMA DI SINI. Notifikasi sekarang ditangani di syncToGoogleDrive.
+    // >>> TAMPILKAN OVERLAY SEBELUM MEMULAI PROSES ASINKRON
+    showLoadingOverlay();
     
-    // Panggil fungsi sinkronisasi dan TUNGGU hingga selesai
     try {
         console.log(`Data lokal ${fileName} berhasil disimpan. Mencoba sinkronisasi ke Google Drive...`);
         // Menggunakan 'await' untuk menunggu proses sinkronisasi dan konversi file selesai
@@ -428,7 +431,11 @@ async function saveData() {
         // Notifikasi kegagalan sinkronisasi (jika terjadi)
         console.error('Sinkronisasi gagal:', error);
         alert('Data berhasil disimpan secara lokal, tetapi GAGAL sinkronisasi ke Google Drive. Periksa konsol untuk detail atau coba download manual.');
+    } finally {
+        // >>> SEMBUNYIKAN OVERLAY SETELAH SEMUA PROSES SELESAI
+        hideLoadingOverlay();
     }
+    
     renderSavedFiles();
     resetFullForm();
 }
@@ -510,7 +517,7 @@ async function syncToGoogleDrive(fileData) {
         if (response.success) {
             console.log('Upload berhasil!', response.message);
             // Notifikasi gabungan yang baru
-            alert(`Data berhasil disimpan secara lokal DAN Sinkronisasi ke Google Drive berhasil!`); 
+            alert(`Data berhasil disimpan dan Sinkronisasi ke Google Drive berhasil!`); 
         } else {
             // LEMPARKAN ERROR agar ditangkap oleh 'catch' di saveData()
             throw new Error(response.message || 'Respons Apps Script tidak sukses.');
@@ -799,6 +806,29 @@ async function syncToGoogleDrive(fileData) {
         DOMElements.modal.style.display = 'none';
         currentModalAction.onConfirm = null;
         currentModalAction.onCancel = null;
+    }
+    
+    // =========================================================================
+    // 7.b UTILITY OVERLAY FREEZE (BARU)
+    // =========================================================================
+    
+    /**
+     * Menampilkan loading overlay dan memblokir input user.
+     */
+    function showLoadingOverlay() {
+        // Mencegah error jika elemen tidak ditemukan
+        if (DOMElements.loadingOverlay) {
+            DOMElements.loadingOverlay.style.display = 'flex';
+        }
+    }
+
+    /**
+     * Menyembunyikan loading overlay dan mengaktifkan kembali input user.
+     */
+    function hideLoadingOverlay() {
+        if (DOMElements.loadingOverlay) {
+            DOMElements.loadingOverlay.style.display = 'none';
+        }
     }
     // =========================================================================
     // 8. JALANKAN APLIKASI
