@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Line Walk Through</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-left"> <h1>IA</h1> </div>
+            <div class="header-right"> <h1>Line Walk Through</h1> </div>
+        </header>
+        <main>
+            <section class="form-section card">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="auditor">Auditor</label>
+                        <input type="text" id="auditor" placeholder="Nama Auditor...">
+                    </div>
+                    <div class="form-group">
+                        <label for="validation-category">Validation Category</label>
+                        <select id="validation-category">
+                            <option value="">Pilih Kategori...</option>
+                            <option value="HFPA">HFPA</option>
+                            <option value="FTT">FTT</option>
+                            <option value="PEAC">PEAC</option>
+                        </select>
+                    </div>
+                    <div class="form-group autocomplete-container">
+                        <label for="style-number">Style Number</label>
+                        <input type="text" id="style-number" placeholder="Ketik untuk mencari...">
+                        <div id="autocomplete-results" class="autocomplete-results"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="model">Model</label>
+                        <input type="text" id="model" placeholder="Otomatis terisi" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label for="line">Line</label>
+                        <select id="line">
+                            <option value="">Pilih Line...</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+            <section class="data-entry-section card">
+                <h2>Inspection</h2>
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th class="col-pair">Pair #</th>
+                                <th class="col-status">Status</th>
+                                <th class="col-defect">Tipe Defect</th>
+                                <th class="col-photo">Foto Defect</th>
+                                <th class="col-action">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-entry-body">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            <div class="actions">
+                <button id="save-button" class="btn btn-primary">Simpan Data</button>
+            </div>
+            <section class="saved-files-section card">
+                <div class="saved-files-header">
+                    <h2>File Tersimpan</h2>
+                    <div class="gdrive-status">
+                        <a href="https://drive.google.com/drive/u/0/folders/1qFM20XlWTqTdGBfgH_S5vZ4SRh-RO5wd" target="_blank" class="gdrive-link" title="Buka Google Drive">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <path d="M7.71 3.5L1.15 15L4.58 21L11.13 9.5M9.73 15L6.3 21H19.43L22.85 15M22.28 14L15.73 2.5H8.63L15.18 14" fill="#4285F4"/>
+                            </svg>
+                            <span>Google Drive</span>
+                        </a>
+                    </div>
+                </div>
+                <ul id="saved-files-list"></ul>
+            </section>
+        </main>
+    </div>
+    <div id="app-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content">
+            <h4 id="modal-title">Judul Modal</h4>
+            <div id="modal-body"></div>
+            <div id="modal-actions" class="modal-actions">
+                <button id="modal-confirm-btn" class="btn btn-primary">Konfirmasi</button>
+                <button id="modal-cancel-btn" class="btn btn-secondary">Batal</button>
+            </div>
+        </div>
+    </div>
+    <script src="database.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
