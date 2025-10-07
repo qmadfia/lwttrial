@@ -381,9 +381,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-// GANTI FUNGSI saveData() ANDA DENGAN YANG INI
+// GANTI FUNGSI saveData() ANDA DENGAN KODE BERIKUT INI:
 
-function saveData() {
+async function saveData() {
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = `${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}-${now.getSeconds().toString().padStart(2, '0')}`;
@@ -416,10 +416,19 @@ function saveData() {
     existingData.push(fileData);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData));
     
-    alert(`Data berhasil disimpan secara lokal: ${fileName}\n\nSekarang mencoba sinkronisasi ke Google Drive...`);
+    // HILANGKAN ALERT PERTAMA DI SINI. Notifikasi sekarang ditangani di syncToGoogleDrive.
     
-    // Panggil fungsi sinkronisasi yang baru
-    syncToGoogleDrive(fileData); 
+    // Panggil fungsi sinkronisasi dan TUNGGU hingga selesai
+    try {
+        console.log(`Data lokal ${fileName} berhasil disimpan. Mencoba sinkronisasi ke Google Drive...`);
+        // Menggunakan 'await' untuk menunggu proses sinkronisasi dan konversi file selesai
+        await syncToGoogleDrive(fileData);
+        
+    } catch (error) {
+        // Notifikasi kegagalan sinkronisasi (jika terjadi)
+        console.error('Sinkronisasi gagal:', error);
+        alert('Data berhasil disimpan secara lokal, tetapi GAGAL sinkronisasi ke Google Drive. Periksa konsol untuk detail atau coba download manual.');
+    }
     
     renderSavedFiles();
     resetFullForm();
