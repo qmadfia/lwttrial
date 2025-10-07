@@ -1,0 +1,563 @@
+/* ===========================================
+// 1. Impor Font dan Variabel Global
+// =========================================== */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+:root {
+    /* Warna Dasar */
+    --primary-color: #007bff;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    
+    /* Warna UI & Latar */
+    --light-color: #f8f9fa;
+    --dark-color: #343a40;
+    --background-color: #e9ecef;
+    --border-color: #dee2e6;
+    
+    /* Efek */
+    --card-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+* { 
+    margin: 0; 
+    padding: 0; 
+    box-sizing: border-box; 
+}
+
+/* ===========================================
+// 2. Base Styling dan Layout Utama
+// =========================================== */
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: var(--background-color);
+    color: var(--dark-color);
+    line-height: 1.6;
+    overscroll-behavior: none;
+}
+
+.container { 
+    max-width: 1200px; 
+    margin: 20px auto; 
+    padding: 0 15px; 
+}
+
+/* Card Styling */
+.card {
+    background-color: white; 
+    padding: 25px;
+    border-radius: 8px; 
+    margin-bottom: 20px;
+    box-shadow: var(--card-shadow);
+}
+.card h2 { 
+    margin-bottom: 20px; 
+    color: var(--dark-color); 
+    border-bottom: 2px solid var(--primary-color); 
+    padding-bottom: 10px; 
+    font-size: 1.5em;
+}
+
+/* ===========================================
+// 3. Header dan Navigasi
+// =========================================== */
+header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: var(--card-shadow);
+}
+
+header h1 { 
+    color: var(--primary-color); 
+    font-size: 1.5em; 
+    margin: 0;
+}
+
+/* ===========================================
+// 4. Form Styling (Informasi Umum)
+// =========================================== */
+.form-grid { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
+    gap: 20px; 
+}
+.form-group label { 
+    display: block; 
+    margin-bottom: 8px; 
+    font-weight: 500; 
+}
+.form-group input, .form-group select { 
+    width: 100%; 
+    padding: 10px; 
+    border: 1px solid var(--border-color); 
+    border-radius: 4px; 
+    font-size: 1rem; 
+    transition: border-color 0.2s;
+}
+.form-group input:focus, .form-group select:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+.form-group input[readonly] { 
+    background-color: #e9ecef; 
+    cursor: not-allowed; 
+}
+
+/* Autocomplete Filter Style Number */
+.autocomplete-container { 
+    position: relative; 
+}
+.autocomplete-results {
+    display: none; 
+    position: absolute;
+    border: 1px solid var(--border-color);
+    border-top: none; 
+    z-index: 99;
+    top: 100%; 
+    left: 0; 
+    right: 0;
+    background-color: white; 
+    max-height: 150px;
+    overflow-y: auto; 
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    border-radius: 0 0 4px 4px;
+}
+.autocomplete-results div { 
+    padding: 10px; 
+    cursor: pointer; 
+}
+.autocomplete-results div:hover { 
+    background-color: #e9e9e9; 
+}
+.autocomplete-results .highlight { 
+    font-weight: bold; 
+    color: var(--primary-color);
+}
+
+/* ===========================================
+// 5. Tabel Data Entry dan Interaksi
+// =========================================== */
+
+/* 5.1 Tabel Utama dan Scroll */
+.table-wrapper { 
+    max-height: 500px; 
+    overflow-y: auto; 
+    border: 1px solid var(--border-color); 
+    border-radius: 5px; 
+}
+table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    table-layout: fixed; 
+}
+th, td { 
+    padding: 12px 15px; 
+    text-align: left; 
+    border-bottom: 1px solid var(--border-color); 
+    vertical-align: middle; 
+}
+thead th { 
+    background-color: var(--primary-color); 
+    color: white; 
+    position: sticky; 
+    top: 0; 
+    z-index: 10; 
+}
+tbody tr:nth-child(even) { 
+    background-color: var(--light-color); 
+}
+tbody tr:hover {
+    background-color: #f1f8ff;
+}
+
+/* 5.2 Lebar Kolom */
+.col-pair { width: 8%; }
+.col-status { width: 18%; }
+.col-defect { width: 34%; }
+.col-photo { width: 25%; }
+.col-action { width: 15%; }
+
+/* 5.3 Status Select */
+.status-select { 
+    padding: 8px;
+    border-radius: 4px;
+    background-color: var(--light-color); 
+    color: var(--dark-color); 
+    transition: background-color 0.3s, color 0.3s; 
+}
+.status-select.status-selected.status-ok { 
+    background-color: var(--success-color); 
+    color: white; 
+    font-weight: bold; 
+}
+.status-select.status-selected.status-ng { 
+    background-color: var(--danger-color); 
+    color: white; 
+    font-weight: bold; 
+}
+
+/* 5.4 Defect Input Container */
+.defect-input-container {
+    padding: 5px; 
+    border: 1px solid transparent; 
+    border-radius: 4px; 
+    cursor: pointer;
+    background-color: var(--light-color); 
+    min-height: 40px; 
+    transition: background-color 0.3s;
+    display: flex;
+    align-items: center;
+}
+.defect-input-container.enabled { 
+    border-color: var(--primary-color); 
+    cursor: pointer; 
+    background-color: white; 
+}
+.defect-input-container.disabled { 
+    background-color: #e9ecef; 
+    cursor: not-allowed; 
+    opacity: 0.7; 
+}
+
+/* 5.5 Defect Tags */
+.defect-tags-wrapper { 
+    display: flex; 
+    flex-wrap: wrap; 
+    gap: 5px; 
+    align-items: center; 
+}
+.defect-tag {
+    background-color: var(--secondary-color); 
+    color: white;
+    padding: 3px 8px; 
+    border-radius: 4px; 
+    font-size: 0.85em;
+    word-break: break-word;
+}
+.placeholder-text { 
+    color: #888; 
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+/* 5.6 Aksi Tabel (Hapus Baris) */
+.table-action-btn { 
+    background: none; 
+    border: none; 
+    cursor: pointer; 
+    font-size: 1.5em; 
+    transition: transform 0.2s; 
+    padding: 0;
+}
+.table-action-btn:hover { 
+    transform: scale(1.2); 
+}
+.delete-row-btn { 
+    color: var(--danger-color); 
+}
+
+/* 5.7 Fitur Foto */
+.photo-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.photo-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.thumbnail-wrapper {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+}
+
+.thumbnail-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.remove-photo-btn {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    line-height: 1;
+}
+
+.add-photo-btn {
+    padding: 6px 10px;
+    font-size: 0.9em;
+    cursor: pointer;
+    border-radius: 4px;
+    border: 1px solid var(--primary-color);
+    background-color: transparent;
+    color: var(--primary-color);
+    transition: all 0.2s;
+}
+.add-photo-btn:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.photo-feedback {
+    font-size: 0.8em;
+    color: var(--secondary-color);
+    font-style: italic;
+}
+
+/* 5.8 Modal Defect Selection */
+#defect-selection-modal { padding: 0; }
+#defect-selection-modal .search-bar { 
+    width: 100%; 
+    padding: 10px; 
+    margin-bottom: 10px; 
+    border: 1px solid var(--border-color); 
+    border-radius: 4px; 
+}
+#defect-selection-modal .options-container { 
+    max-height: 250px; 
+    overflow-y: auto; 
+    border: 1px solid #f1f1f1;
+    padding: 5px;
+    border-radius: 4px;
+}
+#defect-selection-modal label { 
+    display: flex;
+    align-items: center;
+    padding: 8px 10px; 
+    cursor: pointer; 
+    border-radius: 4px; 
+    background-color: white;
+    margin-bottom: 2px;
+    text-align: left;
+}
+#defect-selection-modal label:hover { 
+    background-color: #f1f1f1; 
+}
+#defect-selection-modal input[type="checkbox"] { 
+    margin-right: 10px; 
+    transform: scale(1.1);
+}
+
+/* ===========================================
+// 6. Aksi Form dan Daftar File Tersimpan
+// =========================================== */
+.actions { 
+    display: flex; 
+    justify-content: flex-end; 
+    margin-bottom: 20px; 
+}
+
+/* Tombol Umum */
+.btn { 
+    padding: 12px 25px; 
+    border: none; 
+    border-radius: 5px; 
+    cursor: pointer; 
+    font-size: 1rem; 
+    font-weight: 500; 
+    transition: background-color 0.3s ease, box-shadow 0.3s ease; 
+}
+.btn-primary { 
+    background-color: var(--primary-color); 
+    color: white; 
+}
+.btn-primary:hover { 
+    background-color: #0056b3; 
+    box-shadow: 0 4px 10px rgba(0, 123, 255, 0.3);
+}
+.btn-secondary { 
+    background-color: var(--secondary-color); 
+    color: white; 
+}
+.btn-secondary:hover { 
+    background-color: #5a6268; 
+}
+.btn-danger {
+    background-color: var(--danger-color);
+    color: white;
+}
+.btn-danger:hover {
+    background-color: #c82333;
+}
+
+/* Daftar File Tersimpan */
+.saved-files-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.saved-files-header h2 {
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.gdrive-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.gdrive-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 15px;
+    background-color: white;
+    border: 2px solid #4285F4;
+    border-radius: 5px;
+    color: #4285F4;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.gdrive-link:hover {
+    background-color: #4285F4;
+    color: white;
+}
+
+.gdrive-link:hover svg path {
+    fill: white;
+}
+
+.gdrive-link span {
+    font-size: 0.9em;
+}
+
+#saved-files-list { 
+    list-style: none; 
+    padding: 0;
+}
+#saved-files-list li { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    padding: 15px; 
+    border-bottom: 1px solid var(--border-color); 
+}
+#saved-files-list li:last-child {
+    border-bottom: none;
+}
+.file-name {
+    font-weight: 500;
+}
+.file-actions {
+    display: flex;
+    gap: 10px;
+}
+.file-actions .btn {
+    padding: 8px 15px;
+    font-size: 0.9em;
+}
+
+/* ===========================================
+// 7. Modal Konfirmasi
+// =========================================== */
+.modal-overlay { 
+    position: fixed; 
+    top: 0; 
+    left: 0; 
+    width: 100%; 
+    height: 100%; 
+    background-color: rgba(0, 0, 0, 0.6); 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+    z-index: 1000; 
+}
+.modal-content { 
+    background-color: white; 
+    padding: 30px; 
+    border-radius: 8px; 
+    width: 90%; 
+    max-width: 500px; 
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.modal-content h4 {
+    margin-bottom: 15px;
+    color: var(--dark-color);
+    font-size: 1.4em;
+}
+.modal-actions { 
+    margin-top: 20px; 
+    display: flex; 
+    justify-content: center; 
+    gap: 15px; 
+}
+.modal-actions .btn {
+    min-width: 100px;
+}
+
+/* ===========================================
+// 8. Responsifitas
+// =========================================== */
+@media (max-width: 768px) {
+    .container {
+        margin: 10px auto;
+    }
+    header { 
+        flex-direction: column; 
+        text-align: center; 
+        gap: 10px; 
+        padding: 15px;
+    }
+    .form-grid { 
+        grid-template-columns: 1fr; 
+    }
+    .table-wrapper { 
+        max-height: 400px; 
+    }
+    th, td { 
+        font-size: 0.9em; 
+        padding: 8px; 
+    }
+    .file-actions {
+        flex-direction: column;
+        gap: 5px;
+    }
+    .file-actions .btn {
+        width: 100%;
+    }
+    .saved-files-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+    .gdrive-link {
+        width: 100%;
+        justify-content: center;
+    }
+}
