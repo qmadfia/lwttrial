@@ -381,43 +381,136 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function saveData() {
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
-        const timeStr = `${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}-${now.getSeconds().toString().padStart(2, '0')}`;
-        
-        const headerData = {
-            date: dateStr,
-            auditor: DOMElements.auditor.value.trim(),
-            validationCategory: DOMElements.validationCategory.value,
-            styleNumber: DOMElements.styleNumberInput.value,
-            model: DOMElements.model.value,
-            line: DOMElements.line.value
-        };
-        
-        const pairsData = [];
-        DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
-            pairsData.push({
-                pairNumber: parseInt(tr.dataset.pairNumber),
-                status: tr.querySelector('.status-select').value,
-                defects: JSON.parse(tr.dataset.defects || '[]'),
-                photos: JSON.parse(tr.dataset.photos || '[]')
-            });
-        });
-        
-        const fileId = `lwt_${now.getTime()}`;
-        const fileName = `LWT-${headerData.validationCategory || 'DATA'}-${dateStr}-${timeStr}`;
-        const fileData = { id: fileId, name: fileName, header: headerData, pairs: pairsData };
+// GANTI FUNGSI saveData() ANDA DENGAN YANG INI
 
-        const existingData = getSavedData();
-        existingData.push(fileData);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData));
+function saveData() {
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0];
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}-${now.getSeconds().toString().padStart(2, '0')}`;
+    
+    const headerData = {
+        date: dateStr,
+        auditor: DOMElements.auditor.value.trim(),
+        validationCategory: DOMElements.validationCategory.value,
+        styleNumber: DOMElements.styleNumberInput.value,
+        model: DOMElements.model.value,
+        line: DOMElements.line.value
+    };
+    
+    const pairsData = [];
+    DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
+        pairsData.push({
+            pairNumber: parseInt(tr.dataset.pairNumber),
+            status: tr.querySelector('.status-select').value,
+            defects: JSON.parse(tr.dataset.defects || '[]'),
+            photos: JSON.parse(tr.dataset.photos || '[]')
+        });
+    });
+    
+    const fileId = `lwt_${now.getTime()}`;
+    const fileName = `LWT-${headerData.validationCategory || 'DATA'}-${dateStr}-${timeStr}`;
+    const fileData = { id: fileId, name: fileName, header: headerData, pairs: pairsData };
+
+    // Simpan ke penyimpanan lokal
+    const existingData = getSavedData();
+    existingData.push(fileData);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(existingData));
+    
+    alert(`Data berhasil disimpan secara lokal: ${fileName}\n\nSekarang mencoba sinkronisasi ke Google Drive...`);
+    
+    // Panggil fungsi sinkronisasi yang baru
+    syncToGoogleDrive(fileData); 
+    
+    renderSavedFiles();
+    resetFullForm();
+}
+
+// TAMBAHKAN FUNGSI BARU INI KE DALAM script.js
+
+/**
+ * Membuat file ZIP, mengubahnya menjadi base64, dan mengirimkannya ke Google Apps Script.
+ * @param {Object} fileData - Objek data lengkap yang akan disinkronkan.
+ */
+async function syncToGoogleDrive(fileData) {
+    console.log("Mempersiapkan file ZIP untuk diunggah...");
+    
+    try {
+        const zip = new JSZip();
+        const imgFolder = zip.folder("images");
+
+        // 1. Buat konten Excel (sama seperti di fungsi download)
+        const excelHeaders = ['Date', 'Auditor', 'Validation Category', 'Style Number', 'Model', 'Line', 'Pair Number', 'OK/NG', 'Photos Attached', 'Defect type 1', 'Defect type 2', 'Defect type 3', 'Defect type 4', 'Defect type 5', 'Defect type 6', 'Defect type 7', 'Defect type 8', 'Defect type 9', 'Defect type 10'];
+        const dataForSheet = [excelHeaders];
         
-        alert(`Data berhasil disimpan: ${fileName}\n\nCatatan: File akan otomatis tersinkronisasi ke Google Drive.`);
+        fileData.pairs.forEach(pair => {
+            const photoNames = [];
+            if (pair.photos && pair.photos.length > 0) {
+                pair.photos.forEach((photo, index) => {
+                    const photoName = `Pair-${pair.pairNumber}-Foto-${index + 1}.jpg`;
+                    photoNames.push(photoName);
+                    const base64Data = photo.data.split(',')[1];
+                    imgFolder.file(photoName, base64Data, { base64: true });
+                });
+            }
+            const row = [fileData.header.date, fileData.header.auditor, fileData.header.validationCategory, fileData.header.styleNumber, fileData.header.model, fileData.header.line, pair.pairNumber, pair.status, photoNames.join(', ')];
+            for (let i = 0; i < 10; i++) {
+                row.push(pair.defects[i] || '');
+            }
+            dataForSheet.push(row);
+        });
+
+        const ws1 = XLSX.utils.aoa_to_sheet(dataForSheet);
+        const summaryData = generateSummaryData(fileData); // Pastikan fungsi ini ada
+        const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
         
-        renderSavedFiles();
-        resetFullForm();
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws1, 'LWT Report');
+        XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+        
+        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        zip.file(`${fileData.name}.xlsx`, excelBuffer);
+
+        // 2. Generate ZIP sebagai blob, lalu konversi ke base64
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const reader = new FileReader();
+        reader.readAsDataURL(zipBlob);
+        reader.onloadend = function() {
+            const base64data = reader.result;
+            // Hapus header data URL (misal: "data:application/zip;base64,")
+            const zipBase64 = base64data.split(',')[1]; 
+
+            // 3. Kirim data ke Google Apps Script
+            const payload = {
+                fileName: fileData.name,
+                zipFile: zipBase64
+            };
+
+            console.log("Mengirim data ke Google Apps Script...");
+            fetch(GAS_WEB_APP_URL, {
+                method: 'POST',
+                body: JSON.stringify(payload),
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' } // Apps Script V8 runtime lebih baik dengan text/plain
+            })
+            .then(res => res.json())
+            .then(response => {
+                if (response.success) {
+                    console.log('Upload berhasil!', response.message);
+                    alert('Sinkronisasi ke Google Drive berhasil!');
+                } else {
+                    throw new Error(response.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error saat sinkronisasi:', error);
+                alert('Gagal sinkronisasi ke Google Drive. Error: ' + error.message);
+            });
+        };
+
+    } catch (error) {
+        console.error("Gagal membuat file ZIP:", error);
+        alert("Gagal mempersiapkan file untuk diunggah.");
     }
+}
     
     function resetFullForm() {
         DOMElements.auditor.value = '';
