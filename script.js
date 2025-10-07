@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const STORAGE_KEY = 'lineWalkThroughData';
     const TOTAL_PAIRS = 20;
     let currentModalAction = { onConfirm: null, onCancel: null };
+    loadingOverlay: document.getElementById('loading-overlay'),
     
     // URL Google Apps Script Web App (ganti dengan URL deploy Anda)
     const GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx05PeKZfdSM6qSNa9tSFpqcjeBrckNQ8KdWDcKOXZ_t4zlek7ycCrx6xXOxfstwH7grw/exec';
@@ -429,7 +430,21 @@ async function saveData() {
         console.error('Sinkronisasi gagal:', error);
         alert('Data berhasil disimpan secara lokal, tetapi GAGAL sinkronisasi ke Google Drive. Periksa konsol untuk detail atau coba download manual.');
     }
+        showLoadingOverlay(); // <-- TAMPILKAN OVERLAY SEBELUM MEMULAI PROSES ASINKRON
     
+    try {
+        console.log(`Data lokal ${fileName} berhasil disimpan. Mencoba sinkronisasi ke Google Drive...`);
+        
+        await syncToGoogleDrive(fileData);
+        
+    } catch (error) {
+        // Notifikasi kegagalan sinkronisasi (jika terjadi)
+        console.error('Sinkronisasi gagal:', error);
+        alert('Data berhasil disimpan secara lokal, tetapi GAGAL sinkronisasi ke Google Drive. Periksa konsol untuk detail atau coba download manual.');
+    } finally {
+        // finally block akan selalu dijalankan, baik 'try' berhasil atau 'catch' dieksekusi
+        hideLoadingOverlay(); // <-- SEMBUNYIKAN OVERLAY SETELAH PROSES SELESAI
+    }
     renderSavedFiles();
     resetFullForm();
 }
@@ -801,7 +816,19 @@ async function syncToGoogleDrive(fileData) {
         currentModalAction.onConfirm = null;
         currentModalAction.onCancel = null;
     }
+/**
+ * Menampilkan loading overlay dan memblokir input user.
+ */
+function showLoadingOverlay() {
+    DOMElements.loadingOverlay.style.display = 'flex';
+}
 
+/**
+ * Menyembunyikan loading overlay dan mengaktifkan kembali input user.
+ */
+function hideLoadingOverlay() {
+    DOMElements.loadingOverlay.style.display = 'none';
+}
     // =========================================================================
     // 8. JALANKAN APLIKASI
     // =========================================================================
