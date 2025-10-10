@@ -645,9 +645,11 @@ async function handleSavedFilesActions(e) {
     if (!fileId) return;
 
     if (target.classList.contains('download-btn')) {
-        const fileData = (await getSavedData()).find(item => item.id === fileId);
+        const fileData = (await getFromDB()).find(item => item.id === fileId);
         if (!fileData) {
-            alert('Data file tidak ditemukan!');
+            // Hilangkan popup, cukup refresh daftar
+            const existingData = await getFromDB();
+            await renderSavedFilesOptimized(existingData, null);
             return;
         }
         try {
@@ -887,34 +889,15 @@ function generateSummaryData(fileData) {
         return [headers, dataRow];
     }
 
-    async function renderSavedFiles() {
-        const data = await getSavedData();
-        const listElement = DOMElements.savedFilesList;
-        listElement.innerHTML = '';
-        
-        if (data.length === 0) {
-            listElement.innerHTML = '<li>Belum ada data yang tersimpan.</li>';
-            return;
-        }
-        
-        data.forEach(file => {
-            const li = document.createElement('li');
-            li.innerHTML = `
-                <span class="file-name">${file.name}</span>
-                <div class="file-actions">
-                    <button class="btn btn-primary download-btn" data-id="${file.id}">Download</button>
-                    <button class="btn btn-danger delete-btn" data-id="${file.id}">Hapus</button>
-                </div>
-            `;
-            listElement.appendChild(li);
-        });
-    }
-
 async function renderSavedFilesOptimized(existingData, newFileData) {
     const listElement = DOMElements.savedFilesList;
 
-    // Tambahkan data baru ke existingData
-    const data = [...existingData, newFileData].sort((a, b) => b.id.localeCompare(a.id)); // Urutkan berdasarkan ID (terbaru dulu)
+    // Tambahkan data baru jika ada
+    let data = existingData;
+    if (newFileData) {
+        data = [...existingData, newFileData];
+    }
+    data = data.sort((a, b) => b.id.localeCompare(a.id)); // Urutkan berdasarkan ID (terbaru dulu)
 
     if (data.length === 0) {
         listElement.innerHTML = '<li>Belum ada data yang tersimpan.</li>';
