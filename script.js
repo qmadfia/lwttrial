@@ -190,7 +190,7 @@ async function initializeApp() {
                         <div class="photo-gallery"></div>
                         <span class="photo-feedback">Belum ada foto.</span>
                         <button class="add-photo-btn" style="display:none;">+ Tambah Foto</button>
-                        <input type="file" accept="image/*" class="hidden-file-input" multiple style="display:none;">
+                        <input type="file" accept="image/*,text/plain" class="hidden-file-input" multiple style="display:none;">
                     </div>
                 </td>
                 <td class="col-action">
