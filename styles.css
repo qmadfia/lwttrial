@@ -29,7 +29,7 @@
 /* ===========================================
 // 2. Base Styling dan Layout Utama
 // =========================================== */
-body {
+html, body {
     font-family: 'Roboto', sans-serif;
     background-color: var(--background-color);
     color: var(--dark-color);
@@ -423,38 +423,6 @@ tbody tr:hover {
     border: none;
 }
 
-.gdrive-status {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.gdrive-link {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 15px;
-    background-color: white;
-    border: 2px solid #4285F4;
-    border-radius: 5px;
-    color: #4285F4;
-    text-decoration: none;
-    font-weight: 500;
-    transition: all 0.3s ease;
-}
-
-.gdrive-link:hover {
-    background-color: #4285F4;
-    color: white;
-}
-
-.gdrive-link:hover svg path {
-    fill: white;
-}
-
-.gdrive-link span {
-    font-size: 0.9em;
-}
 
 #saved-files-list { 
     list-style: none; 
@@ -522,6 +490,45 @@ tbody tr:hover {
 }
 
 /* ===========================================
+// 7.b Loading Overlay
+// =========================================== */
+#loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    pointer-events: all; /* Memastikan overlay memblokir interaksi */
+}
+
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 15px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+#loading-overlay p {
+    color: white;
+    font-size: 1.2em;
+    font-weight: 500;
+}
+
+/* ===========================================
 // 8. Responsifitas
 // =========================================== */
 @media (max-width: 768px) {
@@ -562,40 +569,3 @@ tbody tr:hover {
     }
 }
 
-/* ===========================================
-// 9. Overlay
-// =========================================== */
-
-/* style.css */
-#loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.7); /* Latar belakang semi-transparan gelap */
-    z-index: 1000; /* Pastikan di atas semua elemen lain */
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    color: white;
-    font-size: 1.2em;
-    cursor: wait; /* Mengubah kursor menjadi kursor tunggu */
-}
-
-/* Gaya dasar spinner (bisa dimodifikasi) */
-.spinner {
-    border: 8px solid #f3f3f3; /* Light grey */
-    border-top: 8px solid #3498db; /* Blue */
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
-    animation: spin 1s linear infinite;
-    margin-bottom: 20px;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
