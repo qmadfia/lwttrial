@@ -614,7 +614,7 @@ async function saveData() {
         });
 
         // Notifikasi sukses
-        alert('Data berhasil disimpan secara lokal!');
+        alert('Data berhasil disimpan!');
 
         // Reset form
         resetFullForm();
@@ -899,36 +899,26 @@ async function renderSavedFilesOptimized(existingData, newFileData) {
     }
     data = data.sort((a, b) => b.id.localeCompare(a.id)); // Urutkan berdasarkan ID (terbaru dulu)
 
+    // Kosongkan listElement sepenuhnya sebelum render
+    listElement.innerHTML = '';
+
+    // Jika tidak ada data, tampilkan pesan placeholder
     if (data.length === 0) {
         listElement.innerHTML = '<li>Belum ada data yang tersimpan.</li>';
         return;
     }
 
-    // Buat set ID yang ada di data
-    const dataIds = new Set(data.map(item => item.id));
-
-    // Hapus elemen yang tidak ada di data
-    Array.from(listElement.children).forEach(li => {
-        const fileId = li.querySelector('.download-btn')?.dataset.id;
-        if (fileId && !dataIds.has(fileId)) {
-            li.remove();
-        }
-    });
-
-    // Tambahkan atau perbarui elemen
+    // Render elemen untuk setiap file
     data.forEach(file => {
-        const existingLi = listElement.querySelector(`.download-btn[data-id="${file.id}"]`)?.closest('li');
-        if (!existingLi) {
-            const li = document.createElement('li');
-            li.innerHTML = `
-                <span class="file-name">${file.name}</span>
-                <div class="file-actions">
-                    <button class="btn btn-primary download-btn" data-id="${file.id}">Download</button>
-                    <button class="btn btn-danger delete-btn" data-id="${file.id}">Hapus</button>
-                </div>
-            `;
-            listElement.insertBefore(li, listElement.firstChild); // Tambahkan di awal untuk urutan terbaru
-        }
+        const li = document.createElement('li');
+        li.innerHTML = `
+            <span class="file-name">${file.name}</span>
+            <div class="file-actions">
+                <button class="btn btn-primary download-btn" data-id="${file.id}">Download</button>
+                <button class="btn btn-danger delete-btn" data-id="${file.id}">Hapus</button>
+            </div>
+        `;
+        listElement.appendChild(li);
     });
 }
 
