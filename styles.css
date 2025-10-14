@@ -84,8 +84,7 @@ header h1 {
 // =========================================== */
 .form-grid { 
     display: grid; 
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); 
-    gap: 20px; 
+grid-template-columns: repeat(5, 1fr); /* Ubah ke 4 kolom tetap */    gap: 20px; 
 }
 .form-group label { 
     display: block; 
@@ -158,7 +157,7 @@ table {
 }
 th, td { 
     padding: 12px 15px; 
-    text-align: left; 
+    text-align: center; 
     border-bottom: 1px solid var(--border-color); 
     vertical-align: middle; 
 }
@@ -177,11 +176,11 @@ tbody tr:hover {
 }
 
 /* 5.2 Lebar Kolom */
-.col-pair { width: 8%; }
-.col-status { width: 18%; }
-.col-defect { width: 34%; }
-.col-photo { width: 25%; }
-.col-action { width: 15%; }
+.col-pair { width: 6%; }
+.col-status { width: 10%; }
+.col-defect { width: 30%; }
+.col-photo { width: 20%; }
+.col-action { width: 5%; }
 
 /* 5.3 Status Select */
 .status-select { 
