@@ -2753,6 +2753,7 @@ const defectTypes = [
     'Wrinkling midsole',
     'Wrinkling Upper',
     'X-Ray',
+    'Hairy',
     'Sockliner Placement - missed position on finished shoes',
     'Painting Quality',
     'Binding or Folding Quality and consistency',
