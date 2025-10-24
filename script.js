@@ -764,83 +764,52 @@ async function handleDownload(fileData) {
      */
 function generateSummaryData(fileData) {
     const categories = {
-        'Contamination': [
-            'Staining/Contamination',
-            'Airbag Contamination (PU, Painting and cement)',
-            'Moldy'
-        ],
-        'Over-cement': [
-            'Over cement on Finish shoes',
-            'Over cement on Bottom unit'
-        ],
-        'Thread End': [
-            'Thread End'
-        ],
-        'Hairy': [
-            'Hairy',
-            'Hot Knife- Incomplete Hot Knife cutting'
-        ],
-        'Poor trimming outsole': [
-            'Cutting/trimming (rubber flash, over triming, component edge; hairy & fraying)',
-            'Rubber outsole quality (under cure, double skin, concave)'
-        ],
-        'Rocking': [
-            'Rocking (>2mm)',
-            'Twisted and Inverted stance (banana shoe)'
-        ],
-        'Stitching / Loose thread': [
-            'Stitching margins and SPI',
-            'Stitching (missing or gaps) - Broken / loose stitched',
-            'Inconsistent Stitching'
-        ],
-        'Scratch/tear/rip high buffing': [
-            'Toe spring',
-            'Lace loop/pull tab attachment - Broken lace loop/pull tab',
-            'Midsole - under/over side wall buffing',
-            'Over buffing',
-            'Broken Lace',
-            'Material tearing/damage'
+        'Airbag': [
+            'Airbag Defect'
         ],
         'Alignment L+R Symmetry': [
-            'Component alignment (visible or expose component)',
-            'Component alignment right versus left',
-            'Off center'
+            'Left & Right not matching'
         ],
-        'Interior (sockliner)': [
-            'Sockliner Placement - missed position on finished shoes'
+        'Bondgap / Bonding': [
+            'Bondgap/Rat Hole',
+            'Delamination'
         ],
-        'Bond gap': [
-            'Rat hole',
-            'Bond Gap and Delamination'
+        'Cement': [
+            'Over cement'
         ],
-        'Wrinkle/crease/mis-shape': [
-            'Midsole shape - less definition, deform and midsole texture',
-            'Toe stuffing (shape and placement inside the shoe)',
-            'Tongue shape',
-            'Wrinkling midsole',
-            'Wrinkling Upper',
-            'Heel, Collar and Toe shape',
-            'Emblishment; Quality and molded component definition'
+        'Contamination': [
+            'Contamination'
         ],
-        'Other': [
-            'Lacing - Finished shoe lacing',
-            'Perforation, laser, or 2nd cutting consistency',
-            'Wrapping paper',
-            'X-Ray',
-            'Binding or Folding Quality and consistency',
-            'Stockfit part Quality (Placement and fitting)',
-            'Inner box condition (crushed, wrinkled, color variation, etc)',
-            'UPC label damaged',
-            'Metal contamination',
-            'No-sew Quality',
-            'Plate/shank damage',
-            'Size mis-match/ Wrong size/Wrong C/O label/Missing UPC label',
-            'Painting Quality',
-            'Color migration and color mismatch',
-            'Midsole Color/Burning',
-            'Outsole colors (dam spillover) - Color Bleeding',
-            'Yellowing on sole unit',
-            'Yellowing on upper'
+        'Interior (including sock-liner)': [
+            'Interior Defect',
+            'Accessories Defect'
+        ],
+        'Poor Quality Spray/ Paint': [
+            'Color/Paint Migration, Bleeding',
+            'Color Mismatch',
+            'Paint Peeled off / Paint Surface Quality'
+        ],
+        'Scratch/ Tear/ Rip/ High Buffing': [
+            'Material Damaged',
+            'Punching holes bad quality',
+            'Over buffing'
+        ],
+        'Stitching/ Loose Thread': [
+            'Jump / Broken / Loose Stitching',
+            'Thread End',
+            'Stitching Margin'
+        ],
+        'Wrinkle/ Crease/ Mis-shape': [
+            'Off Center',
+            'Rocking',
+            'Toe Spring',
+            'Wrinkle or Deformed Bottom',
+            'Wrinkle or Deformed Upper',
+            'X-Ray'
+        ],
+        'Others / Miscellaneous': [
+            'Other Defects',
+            'Yellowing'
         ]
     };
 
