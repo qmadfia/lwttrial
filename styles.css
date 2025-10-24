@@ -176,11 +176,11 @@ tbody tr:hover {
 }
 
 /* 5.2 Lebar Kolom */
-.col-pair { width: 6%; }
-.col-status { width: 10%; }
-.col-defect { width: 30%; }
-.col-photo { width: 20%; }
-.col-action { width: 5%; }
+.col-pair { width: 8%; }
+.col-status { width: 18%; }
+.col-defect { width: 34%; }
+.col-photo { width: 25%; }
+.col-action { width: 15%; }
 
 /* 5.3 Status Select */
 .status-select { 
