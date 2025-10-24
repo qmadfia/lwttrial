@@ -759,9 +759,9 @@ async function handleDownload(fileData) {
     }
 }
 
-    /**
-     * Generate Summary Sheet Data
-     */
+/**
+ * Generate Summary Sheet Data
+ */
 function generateSummaryData(fileData) {
     // Daftar defect langsung tanpa kategori
     const defectList = [
@@ -813,7 +813,31 @@ function generateSummaryData(fileData) {
         'Date',
         'Style Number',
         'Model',
-        ...defectList,
+        'Airbag Defect',
+        'Left & Right not matching',
+        'Bondgap/Rat Hole',
+        'Delamination',
+        'Overcement',
+        'Contamination',
+        'Interior Defect',
+        'Accessories Defect',
+        'Color/Paint Migration, Bleeding',
+        'Color Mismatch',
+        'Paint Peeled off / Paint Surface Quality',
+        'Material Damaged',
+        'Punching holes bad quality',
+        'Overbuffing',
+        'Jump / Broken / Loose Stitching',
+        'Thread End',
+        'Stitching Margin',
+        'Off Center',
+        'Rocking',
+        'Toe Spring',
+        'Wrinkle or Deformed Bottom',
+        'Wrinkle or Deformed Upper',
+        'X-Ray',
+        'Other Defects',
+        'Yellowing',
         'Total Defect'
     ];
 
@@ -821,7 +845,31 @@ function generateSummaryData(fileData) {
         fileData.header.date,
         fileData.header.styleNumber,
         fileData.header.model,
-        ...defectList.map(defect => defectCounts[defect]),
+        defectCounts['Airbag Defect'],
+        defectCounts['Left & Right not matching'],
+        defectCounts['Bondgap/Rat Hole'],
+        defectCounts['Delamination'],
+        defectCounts['Overcement'],
+        defectCounts['Contamination'],
+        defectCounts['Interior Defect'],
+        defectCounts['Accessories Defect'],
+        defectCounts['Color/Paint Migration, Bleeding'],
+        defectCounts['Color Mismatch'],
+        defectCounts['Paint Peeled off / Paint Surface Quality'],
+        defectCounts['Material Damaged'],
+        defectCounts['Punching holes bad quality'],
+        defectCounts['Overbuffing'],
+        defectCounts['Jump / Broken / Loose Stitching'],
+        defectCounts['Thread End'],
+        defectCounts['Stitching Margin'],
+        defectCounts['Off Center'],
+        defectCounts['Rocking'],
+        defectCounts['Toe Spring'],
+        defectCounts['Wrinkle or Deformed Bottom'],
+        defectCounts['Wrinkle or Deformed Upper'],
+        defectCounts['X-Ray'],
+        defectCounts['Other Defects'],
+        defectCounts['Yellowing'],
         totalDefects
     ];
 
