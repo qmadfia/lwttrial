@@ -762,6 +762,25 @@ async function handleDownload(fileData) {
                 });
             }
 
+            // MODIFIKASI BAGIAN INI - Gabungkan defect biasa dengan Other Defects
+            const allDefects = [];
+            
+            // Tambahkan defect biasa (yang bukan "Other Defects")
+            if (pair.defects && pair.defects.length > 0) {
+                pair.defects.forEach(defect => {
+                    if (defect !== 'Other Defects') {
+                        allDefects.push(defect);
+                    }
+                });
+            }
+            
+            // Tambahkan semua detail Other Defects sebagai "Other Defects"
+            if (pair.otherDefects && pair.otherDefects.length > 0) {
+                pair.otherDefects.forEach(() => {
+                    allDefects.push('Other Defects');
+                });
+            }
+
             const row = [
                 fileData.header.date,
                 fileData.header.auditor,
@@ -772,7 +791,7 @@ async function handleDownload(fileData) {
                 pair.pairNumber,
                 pair.status,
                 photoNames.join(', '),
-                ...Array(10).fill('').map((_, i) => pair.defects[i] || '')
+                ...Array(10).fill('').map((_, i) => allDefects[i] || '')
             ];
 
             dataForSheet.push(row);
@@ -788,7 +807,7 @@ async function handleDownload(fileData) {
         const summaryData = generateSummaryData(fileData);
         const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
 
-        // ===== SHEET 3: Other Defects (BARU) =====
+        // ===== SHEET 3: Other Defects =====
         const otherDefectsData = generateOtherDefectsSheet(fileData);
         const ws3 = XLSX.utils.aoa_to_sheet(otherDefectsData);
 
@@ -796,7 +815,7 @@ async function handleDownload(fileData) {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws1, 'LWT Report');
         XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
-        XLSX.utils.book_append_sheet(wb, ws3, 'Other Defects'); // TAMBAHKAN SHEET BARU
+        XLSX.utils.book_append_sheet(wb, ws3, 'Other Defects');
 
         const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
         zip.file(`${fileData.name}.xlsx`, excelBuffer);
@@ -860,9 +879,9 @@ function generateSummaryData(fileData) {
         if (pair.defects && pair.defects.length > 0) {
             pair.defects.forEach(defect => {
                 if (defectList.includes(defect)) {
-                    // MODIFIKASI: Untuk Other Defects, hitung berdasarkan jumlah pair yang memilikinya
+                    // MODIFIKASI: Untuk Other Defects, hitung jumlah detail yang diinput
                     if (defect === 'Other Defects' && pair.otherDefects && pair.otherDefects.length > 0) {
-                        defectCounts[defect]++;
+                        defectCounts[defect] += pair.otherDefects.length; // UBAH DARI ++ MENJADI += length
                     } else if (defect !== 'Other Defects') {
                         defectCounts[defect]++;
                     }
@@ -873,7 +892,6 @@ function generateSummaryData(fileData) {
 
     const totalDefects = Object.values(defectCounts).reduce((a, b) => a + b, 0);
 
-    // Build summary array (sisanya tetap sama)
     const headers = [
         'Date',
         'Style Number',
