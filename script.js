@@ -833,27 +833,41 @@ function generateSummaryData(fileData) {
         const totalDefects = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
 
         // Build summary array
-        const headers = ['Date', 'Style Number', 'Model', 'Contamination', 'Over-cement', 'Thread End', 'Hairy', 'Poor trimming outsole', 'Rocking', 'Stitching / Loose thread', 'Scratch/tear/rip high buffing', 'Alignment L+R Symmetry', 'Interior (sockliner)', 'Bond gap', 'Wrinkle/crease/mis-shape', 'Other', 'Total Defect'];
-        
-        const dataRow = [
-            fileData.header.date,
-            fileData.header.styleNumber,
-            fileData.header.model,
-            categoryCounts['Contamination'],
-            categoryCounts['Over-cement'],
-            categoryCounts['Thread End'],
-            categoryCounts['Hairy'],
-            categoryCounts['Poor trimming outsole'],
-            categoryCounts['Rocking'],
-            categoryCounts['Stitching / Loose thread'],
-            categoryCounts['Scratch/tear/rip high buffing'],
-            categoryCounts['Alignment L+R Symmetry'],
-            categoryCounts['Interior (sockliner)'],
-            categoryCounts['Bond gap'],
-            categoryCounts['Wrinkle/crease/mis-shape'],
-            categoryCounts['Other'],
-            totalDefects
-        ];
+const headers = [
+    'Date',
+    'Style Number',
+    'Model',
+    'Airbag',
+    'Alignment L+R Symmetry',
+    'Bondgap / Bonding',
+    'Cement',
+    'Contamination',
+    'Interior (including sock-liner)',
+    'Poor Quality Spray/ Paint',
+    'Scratch/ Tear/ Rip/ High Buffing',
+    'Stitching/ Loose Thread',
+    'Wrinkle/ Crease/ Mis-shape',
+    'Others / Miscellaneous',
+    'Total Defect'
+];
+
+const dataRow = [
+    fileData.header.date,
+    fileData.header.styleNumber,
+    fileData.header.model,
+    categoryCounts['Airbag'],
+    categoryCounts['Alignment L+R Symmetry'],
+    categoryCounts['Bondgap / Bonding'],
+    categoryCounts['Cement'],
+    categoryCounts['Contamination'],
+    categoryCounts['Interior (including sock-liner)'],
+    categoryCounts['Poor Quality Spray/ Paint'],
+    categoryCounts['Scratch/ Tear/ Rip/ High Buffing'],
+    categoryCounts['Stitching/ Loose Thread'],
+    categoryCounts['Wrinkle/ Crease/ Mis-shape'],
+    categoryCounts['Others / Miscellaneous'],
+    totalDefects
+];
 
         return [headers, dataRow];
     }
