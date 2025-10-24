@@ -763,114 +763,70 @@ async function handleDownload(fileData) {
      * Generate Summary Sheet Data
      */
 function generateSummaryData(fileData) {
-    const categories = {
-        'Airbag': [
-            'Airbag Defect'
-        ],
-        'Alignment L+R Symmetry': [
-            'Left & Right not matching'
-        ],
-        'Bondgap / Bonding': [
-            'Bondgap/Rat Hole',
-            'Delamination'
-        ],
-        'Cement': [
-            'Over cement'
-        ],
-        'Contamination': [
-            'Contamination'
-        ],
-        'Interior (including sock-liner)': [
-            'Interior Defect',
-            'Accessories Defect'
-        ],
-        'Poor Quality Spray/ Paint': [
-            'Color/Paint Migration, Bleeding',
-            'Color Mismatch',
-            'Paint Peeled off / Paint Surface Quality'
-        ],
-        'Scratch/ Tear/ Rip/ High Buffing': [
-            'Material Damaged',
-            'Punching holes bad quality',
-            'Over buffing'
-        ],
-        'Stitching/ Loose Thread': [
-            'Jump / Broken / Loose Stitching',
-            'Thread End',
-            'Stitching Margin'
-        ],
-        'Wrinkle/ Crease/ Mis-shape': [
-            'Off Center',
-            'Rocking',
-            'Toe Spring',
-            'Wrinkle or Deformed Bottom',
-            'Wrinkle or Deformed Upper',
-            'X-Ray'
-        ],
-        'Others / Miscellaneous': [
-            'Other Defects',
-            'Yellowing'
-        ]
-    };
+    // Daftar defect langsung tanpa kategori
+    const defectList = [
+        'Airbag Defect',
+        'Left & Right not matching',
+        'Bondgap/Rat Hole',
+        'Delamination',
+        'Over cement',
+        'Contamination',
+        'Interior Defect',
+        'Accessories Defect',
+        'Color/Paint Migration, Bleeding',
+        'Color Mismatch',
+        'Paint Peeled off / Paint Surface Quality',
+        'Material Damaged',
+        'Punching holes bad quality',
+        'Over buffing',
+        'Jump / Broken / Loose Stitching',
+        'Thread End',
+        'Stitching Margin',
+        'Off Center',
+        'Rocking',
+        'Toe Spring',
+        'Wrinkle or Deformed Bottom',
+        'Wrinkle or Deformed Upper',
+        'X-Ray',
+        'Other Defects',
+        'Yellowing'
+    ];
 
-        // Count defects per category
-        const categoryCounts = {};
-        Object.keys(categories).forEach(cat => categoryCounts[cat] = 0);
+    // Hitung jumlah setiap defect
+    const defectCounts = {};
+    defectList.forEach(defect => defectCounts[defect] = 0);
 
-        fileData.pairs.forEach(pair => {
-            if (pair.defects && pair.defects.length > 0) {
-                pair.defects.forEach(defect => {
-                    for (const [category, defectList] of Object.entries(categories)) {
-                        if (defectList.includes(defect)) {
-                            categoryCounts[category]++;
-                            break;
-                        }
-                    }
-                });
-            }
-        });
+    fileData.pairs.forEach(pair => {
+        if (pair.defects && pair.defects.length > 0) {
+            pair.defects.forEach(defect => {
+                if (defectList.includes(defect)) {
+                    defectCounts[defect]++;
+                }
+            });
+        }
+    });
 
-        const totalDefects = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
+    const totalDefects = Object.values(defectCounts).reduce((a, b) => a + b, 0);
 
-        // Build summary array
-const headers = [
-    'Date',
-    'Style Number',
-    'Model',
-    'Airbag',
-    'Alignment L+R Symmetry',
-    'Bondgap / Bonding',
-    'Cement',
-    'Contamination',
-    'Interior (including sock-liner)',
-    'Poor Quality Spray/ Paint',
-    'Scratch/ Tear/ Rip/ High Buffing',
-    'Stitching/ Loose Thread',
-    'Wrinkle/ Crease/ Mis-shape',
-    'Others / Miscellaneous',
-    'Total Defect'
-];
+    // Build summary array
+    const headers = [
+        'Date',
+        'Style Number',
+        'Model',
+        ...defectList,
+        'Total Defect'
+    ];
 
-const dataRow = [
-    fileData.header.date,
-    fileData.header.styleNumber,
-    fileData.header.model,
-    categoryCounts['Airbag'],
-    categoryCounts['Alignment L+R Symmetry'],
-    categoryCounts['Bondgap / Bonding'],
-    categoryCounts['Cement'],
-    categoryCounts['Contamination'],
-    categoryCounts['Interior (including sock-liner)'],
-    categoryCounts['Poor Quality Spray/ Paint'],
-    categoryCounts['Scratch/ Tear/ Rip/ High Buffing'],
-    categoryCounts['Stitching/ Loose Thread'],
-    categoryCounts['Wrinkle/ Crease/ Mis-shape'],
-    categoryCounts['Others / Miscellaneous'],
-    totalDefects
-];
+    const dataRow = [
+        fileData.header.date,
+        fileData.header.styleNumber,
+        fileData.header.model,
+        ...defectList.map(defect => defectCounts[defect]),
+        totalDefects
+    ];
 
-        return [headers, dataRow];
-    }
+    return [headers, dataRow];
+}
 
 async function renderSavedFilesOptimized(existingData, newFileData) {
     const listElement = DOMElements.savedFilesList;
