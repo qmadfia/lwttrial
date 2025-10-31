@@ -952,48 +952,66 @@ const defectCategories = {
 /**
  * Generate Summary Sheet Data
  */
+ 
+ // =========================================================================
+// MAPPING: Defect → Kategori (untuk Summary Sheet)
+// =========================================================================
+const defectToCategoryMap = {};
+
+// Bangun mapping otomatis dari defectCategories
+Object.entries(defectCategories).forEach(([category, defects]) => {
+    defects.forEach(defect => {
+        defectToCategoryMap[defect] = category;
+    });
+});
+
+// Tambahkan mapping untuk "Other Defects" → masuk ke kategori "Other Defects"
+defectToCategoryMap['Other Defects'] = 'Other Defects'; // placeholder, akan diganti nanti
 /**
  * Generate Summary Sheet Data - Dengan Kategori
  */
+/**
+ * Generate Summary Sheet Data - Struktur tetap: Date, Style, Model, [Defect1..DefectN], Total
+ * TAPI: Semua defect (termasuk otherDefects) masuk ke kolom kategori masing-masing
+ */
 function generateSummaryData(fileData) {
-    // Inisialisasi hitungan
+    // Daftar kategori (sesuai urutan di defectCategories)
+    const categories = Object.keys(defectCategories);
+
+    // Inisialisasi hitungan per kategori
     const categoryCounts = {};
-    Object.keys(defectCategories).forEach(cat => {
-        categoryCounts[cat] = 0;
-    });
+    categories.forEach(cat => categoryCounts[cat] = 0);
 
-    // Hitung jumlah defect per kategori
+    // Hitung dari SEMUA defect: biasa + otherDefects
     fileData.pairs.forEach(pair => {
-        const defects = [...(pair.defects || []), ...(pair.otherDefects || [])]; // Gabungkan semua
+        const allDefects = [
+            ...(pair.defects || []).filter(d => d !== 'Other Defects'), // defect biasa
+            ...(pair.otherDefects || []) // SEMUA detail "Other Defects"
+        ];
 
-        defects.forEach(defect => {
-            // Cari di mana defect ini termasuk
-            for (const [category, defectList] of Object.entries(defectCategories)) {
-                if (defectList.includes(defect)) {
-                    categoryCounts[category]++;
-                    break;
-                }
+        allDefects.forEach(defect => {
+            const category = defectToCategoryMap[defect];
+            if (category && categoryCounts.hasOwnProperty(category)) {
+                categoryCounts[category]++;
             }
         });
     });
 
-    // Total semua defect
+    // Hitung total defect
     const totalDefects = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
 
-    // Build data untuk Excel: [Kategori, Jumlah]
-    const headers = ['Category', 'Total'];
-    const dataRows = [headers];
+    // Bangun header dan data row
+    const headers = ['Date', 'Style Number', 'Model', ...categories, 'Total Defect'];
+    const dataRow = [
+        fileData.header.date,
+        fileData.header.styleNumber,
+        fileData.header.model,
+        ...categories.map(cat => categoryCounts[cat]),
+        totalDefects
+    ];
 
-    Object.entries(categoryCounts).forEach(([category, count]) => {
-        dataRows.push([category, count]);
-    });
-
-    // Tambahkan baris Total
-    dataRows.push(['Total Defects', totalDefects]);
-
-    return dataRows;
+    return [headers, dataRow];
 }
-
 /**
  * Generate Other Defects Sheet Data
  */
