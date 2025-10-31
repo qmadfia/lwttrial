@@ -986,27 +986,31 @@ defectToCategoryMap['Other Defects'] = 'Other Defects'; // placeholder, akan dig
 /**
  * Generate Summary Sheet Data - FINAL: otherDefects dihitung SEKALI SAJA
  */
+/**
+ * Generate Summary Sheet Data - FIXED: otherDefects tidak dihitung ganda
+ */
 function generateSummaryData(fileData) {
     const categories = Object.keys(defectCategories);
     const categoryCounts = {};
     categories.forEach(cat => categoryCounts[cat] = 0);
 
     fileData.pairs.forEach(pair => {
-        // === 1. HITUNG OTHER DEFECTS SEKALI SAJA ===
-        if ((pair.defects || []).includes('Other Defects') && pair.otherDefects) {
-            const otherCount = pair.otherDefects.length;
-            categoryCounts['Other Defects'] += otherCount; // Hanya sekali!
-        }
-
-        // === 2. HITUNG DEFECT BIASA (kecuali 'Other Defects') ===
+        // 1. Defect biasa (dari checkbox) - KECUALI "Other Defects"
         (pair.defects || []).forEach(defect => {
             if (defect !== 'Other Defects') {
+                // Defect biasa → cari kategorinya
                 const category = defectToCategoryMap[defect];
                 if (category && categoryCounts.hasOwnProperty(category)) {
                     categoryCounts[category]++;
                 }
             }
         });
+
+        // 2. Other Defects → hitung HANYA dari otherDefects array
+        if ((pair.defects || []).includes('Other Defects')) {
+            const otherCount = (pair.otherDefects || []).length;
+            categoryCounts['Other Defects'] += otherCount;
+        }
     });
 
     const totalDefects = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
