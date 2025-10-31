@@ -882,6 +882,9 @@ const defectCategories = {
     'Color Mismatch': [
         'Color mismatch'
     ],
+     'Paint Peeled off / Paint Surface Quality': [
+        ''
+    ],   
     'Material Damaged': [
         'Material tearing/damage',
         'Perforation, laser, or 2nd cutting consistency'
