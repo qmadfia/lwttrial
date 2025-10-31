@@ -840,123 +840,158 @@ async function handleDownload(fileData) {
     }
 }
 
+// =========================================================================
+// KATEGORI DEFECT (DI ATAS FUNGSI generateSummaryData)
+// =========================================================================
+
+const defectCategories = {
+    'Airbag Defect': [
+        'Airbag Contamination (PU, Painting and cement)'
+    ],
+    'Left & Right not matching': [
+        'Component alignment (visible or expose component)',
+        'Component alignment right versus left'
+    ],
+    'Bondgap/Rat Hole': [
+        'Rat hole',
+        'Bond Gap'
+    ],
+    'Delamination': [
+        'Delamination'
+    ],
+    'Overcement': [
+        'Over cement on Finish shoes',
+        'Over cement on Bottom unit'
+    ],
+    'Contamination': [
+        'Staining/Contamination',
+        'Moldy'
+    ],
+    'Interior Defect': [
+        'Sockliner Placement - missed position on finished shoes'
+    ],
+    'Accessories Defect': [
+        'Broken Lace',
+        'Lacing - Finished shoe lacing'
+    ],
+    'Color/Paint Migration, Bleeding': [
+        'Painting Quality',
+        'Color migration',
+        'Outsole colors (dam spillover) - Color Bleeding'
+    ],
+    'Color Mismatch': [
+        'Color mismatch'
+    ],
+    'Material Damaged': [
+        'Material tearing/damage',
+        'Perforation, laser, or 2nd cutting consistency'
+    ],
+    'Punching holes bad quality': [
+        'Lace loop/pull tab attachment - Broken lace loop/pull tab'
+    ],
+    'Overbuffing': [
+        'Midsole - under/over side wall buffing',
+        'Over buffing'
+    ],
+    'Jump / Broken / Loose Stitching': [
+        'Stitching (missing or gaps) - Broken / loose stitched'
+    ],
+    'Thread End': [
+        'Thread End'
+    ],
+    'Stitching Margin': [
+        'Stitching margins and SPI',
+        'Inconsistent Stitching'
+    ],
+    'Off Center': [
+        'Off center'
+    ],
+    'Rocking': [
+        'Rocking (>2mm)',
+        'Twisted and Inverted stance (banana shoe)'
+    ],
+    'Toe Spring': [
+        'Toe spring',
+        'Toe stuffing (shape and placement inside the shoe)'
+    ],
+    'Wrinkle or Deformed Bottom': [
+        'Midsole shape - less definition, deform and midsole texture',
+        'Wrinkling midsole'
+    ],
+    'Wrinkle or Deformed Upper': [
+        'Tongue shape',
+        'Wrinkling Upper',
+        'Heel, Collar and Toe shape'
+    ],
+    'X-Ray': [
+        'X-Ray'
+    ],
+    'Other Defects': [
+        'Hairy',
+        'Hot Knife- Incomplete Hot Knife cutting',
+        'Rubber outsole quality (under cure, double skin, concave)',
+        'Cutting/trimming (rubber flash, over triming, component edge; hairy & fraying)',
+        'Wrapping paper',
+        'Binding or Folding Quality and consistency',
+        'Stockfit part Quality (Placement and fitting)',
+        'Emblishment; Quality and molded component definition',
+        'Inner box condition (crushed, wrinkled, color variation, etc)',
+        'UPC label damaged',
+        'Metal contamination',
+        'No-sew Quality',
+        'Plate/shank damage',
+        'Size mis-match/ Wrong size/Wrong C/O label/Missing UPC label',
+        'Midsole Color/Burning',
+        'Others Defects'
+    ],
+    'Yellowing': [
+        'Yellowing on sole unit',
+        'Yellowing on upper'
+    ]
+};
 /**
  * Generate Summary Sheet Data
  */
+/**
+ * Generate Summary Sheet Data - Dengan Kategori
+ */
 function generateSummaryData(fileData) {
-    const defectList = [
-        'Airbag Defect',
-        'Left & Right not matching',
-        'Bondgap/Rat Hole',
-        'Delamination',
-        'Overcement',
-        'Contamination',
-        'Interior Defect',
-        'Accessories Defect',
-        'Color/Paint Migration, Bleeding',
-        'Color Mismatch',
-        'Paint Peeled off / Paint Surface Quality',
-        'Material Damaged',
-        'Punching holes bad quality',
-        'Overbuffing',
-        'Jump / Broken / Loose Stitching',
-        'Thread End',
-        'Stitching Margin',
-        'Off Center',
-        'Rocking',
-        'Toe Spring',
-        'Wrinkle or Deformed Bottom',
-        'Wrinkle or Deformed Upper',
-        'X-Ray',
-        'Other Defects',
-        'Yellowing'
-    ];
-
-    const defectCounts = {};
-    defectList.forEach(defect => defectCounts[defect] = 0);
-
-    fileData.pairs.forEach(pair => {
-        if (pair.defects && pair.defects.length > 0) {
-            pair.defects.forEach(defect => {
-                if (defectList.includes(defect)) {
-                    // MODIFIKASI: Untuk Other Defects, hitung jumlah detail yang diinput
-                    if (defect === 'Other Defects' && pair.otherDefects && pair.otherDefects.length > 0) {
-                        defectCounts[defect] += pair.otherDefects.length; // UBAH DARI ++ MENJADI += length
-                    } else if (defect !== 'Other Defects') {
-                        defectCounts[defect]++;
-                    }
-                }
-            });
-        }
+    // Inisialisasi hitungan
+    const categoryCounts = {};
+    Object.keys(defectCategories).forEach(cat => {
+        categoryCounts[cat] = 0;
     });
 
-    const totalDefects = Object.values(defectCounts).reduce((a, b) => a + b, 0);
+    // Hitung jumlah defect per kategori
+    fileData.pairs.forEach(pair => {
+        const defects = [...(pair.defects || []), ...(pair.otherDefects || [])]; // Gabungkan semua
 
-    const headers = [
-        'Date',
-        'Style Number',
-        'Model',
-        'Airbag Defect',
-        'Left & Right not matching',
-        'Bondgap/Rat Hole',
-        'Delamination',
-        'Overcement',
-        'Contamination',
-        'Interior Defect',
-        'Accessories Defect',
-        'Color/Paint Migration, Bleeding',
-        'Color Mismatch',
-        'Paint Peeled off / Paint Surface Quality',
-        'Material Damaged',
-        'Punching holes bad quality',
-        'Overbuffing',
-        'Jump / Broken / Loose Stitching',
-        'Thread End',
-        'Stitching Margin',
-        'Off Center',
-        'Rocking',
-        'Toe Spring',
-        'Wrinkle or Deformed Bottom',
-        'Wrinkle or Deformed Upper',
-        'X-Ray',
-        'Other Defects',
-        'Yellowing',
-        'Total Defect'
-    ];
+        defects.forEach(defect => {
+            // Cari di mana defect ini termasuk
+            for (const [category, defectList] of Object.entries(defectCategories)) {
+                if (defectList.includes(defect)) {
+                    categoryCounts[category]++;
+                    break;
+                }
+            }
+        });
+    });
 
-    const dataRow = [
-        fileData.header.date,
-        fileData.header.styleNumber,
-        fileData.header.model,
-        defectCounts['Airbag Defect'],
-        defectCounts['Left & Right not matching'],
-        defectCounts['Bondgap/Rat Hole'],
-        defectCounts['Delamination'],
-        defectCounts['Overcement'],
-        defectCounts['Contamination'],
-        defectCounts['Interior Defect'],
-        defectCounts['Accessories Defect'],
-        defectCounts['Color/Paint Migration, Bleeding'],
-        defectCounts['Color Mismatch'],
-        defectCounts['Paint Peeled off / Paint Surface Quality'],
-        defectCounts['Material Damaged'],
-        defectCounts['Punching holes bad quality'],
-        defectCounts['Overbuffing'],
-        defectCounts['Jump / Broken / Loose Stitching'],
-        defectCounts['Thread End'],
-        defectCounts['Stitching Margin'],
-        defectCounts['Off Center'],
-        defectCounts['Rocking'],
-        defectCounts['Toe Spring'],
-        defectCounts['Wrinkle or Deformed Bottom'],
-        defectCounts['Wrinkle or Deformed Upper'],
-        defectCounts['X-Ray'],
-        defectCounts['Other Defects'],
-        defectCounts['Yellowing'],
-        totalDefects
-    ];
+    // Total semua defect
+    const totalDefects = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
 
-    return [headers, dataRow];
+    // Build data untuk Excel: [Kategori, Jumlah]
+    const headers = ['Category', 'Total'];
+    const dataRows = [headers];
+
+    Object.entries(categoryCounts).forEach(([category, count]) => {
+        dataRows.push([category, count]);
+    });
+
+    // Tambahkan baris Total
+    dataRows.push(['Total Defects', totalDefects]);
+
+    return dataRows;
 }
 
 /**
@@ -967,7 +1002,6 @@ function generateOtherDefectsSheet(fileData) {
     const rows = [headers];
 
     fileData.pairs.forEach(pair => {
-        // Cek apakah pair ini memiliki Other Defects
         if (pair.otherDefects && pair.otherDefects.length > 0) {
             pair.otherDefects.forEach(detail => {
                 rows.push([pair.pairNumber, detail]);
@@ -975,7 +1009,6 @@ function generateOtherDefectsSheet(fileData) {
         }
     });
 
-    // Jika tidak ada Other Defects, kembalikan sheet kosong dengan header saja
     if (rows.length === 1) {
         rows.push(['', 'No Other Defects recorded']);
     }
