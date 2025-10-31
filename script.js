@@ -974,33 +974,40 @@ defectToCategoryMap['Other Defects'] = 'Other Defects'; // placeholder, akan dig
  * Generate Summary Sheet Data - Struktur tetap: Date, Style, Model, [Defect1..DefectN], Total
  * TAPI: Semua defect (termasuk otherDefects) masuk ke kolom kategori masing-masing
  */
+/**
+ * Generate Summary Sheet Data - FIXED: otherDefects masuk ke kategori "Other Defects"
+ */
 function generateSummaryData(fileData) {
-    // Daftar kategori (sesuai urutan di defectCategories)
     const categories = Object.keys(defectCategories);
-
-    // Inisialisasi hitungan per kategori
     const categoryCounts = {};
     categories.forEach(cat => categoryCounts[cat] = 0);
 
-    // Hitung dari SEMUA defect: biasa + otherDefects
     fileData.pairs.forEach(pair => {
-        const allDefects = [
-            ...(pair.defects || []).filter(d => d !== 'Other Defects'), // defect biasa
-            ...(pair.otherDefects || []) // SEMUA detail "Other Defects"
-        ];
-
-        allDefects.forEach(defect => {
-            const category = defectToCategoryMap[defect];
-            if (category && categoryCounts.hasOwnProperty(category)) {
-                categoryCounts[category]++;
+        // 1. Defect biasa (dari checkbox)
+        (pair.defects || []).forEach(defect => {
+            if (defect === 'Other Defects') {
+                // Jika user centang "Other Defects", hitung jumlah detail yang diinput
+                const otherCount = (pair.otherDefects || []).length;
+                categoryCounts['Other Defects'] += otherCount;
+            } else {
+                // Defect biasa → cari kategorinya
+                const category = defectToCategoryMap[defect];
+                if (category && categoryCounts.hasOwnProperty(category)) {
+                    categoryCounts[category]++;
+                }
             }
         });
+
+        // 2. Input manual (otherDefects) → masuk ke "Other Defects"
+        // Tapi: hanya jika "Other Defects" DICENTANG (pair.defects includes 'Other Defects')
+        if ((pair.defects || []).includes('Other Defects')) {
+            const otherCount = (pair.otherDefects || []).length;
+            categoryCounts['Other Defects'] += otherCount;
+        }
     });
 
-    // Hitung total defect
     const totalDefects = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
 
-    // Bangun header dan data row
     const headers = ['Date', 'Style Number', 'Model', ...categories, 'Total Defect'];
     const dataRow = [
         fileData.header.date,
