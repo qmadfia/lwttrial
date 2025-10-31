@@ -983,33 +983,30 @@ defectToCategoryMap['Other Defects'] = 'Other Defects'; // placeholder, akan dig
 /**
  * Generate Summary Sheet Data - FIXED: otherDefects masuk ke kategori "Other Defects"
  */
+/**
+ * Generate Summary Sheet Data - FINAL: otherDefects dihitung SEKALI SAJA
+ */
 function generateSummaryData(fileData) {
     const categories = Object.keys(defectCategories);
     const categoryCounts = {};
     categories.forEach(cat => categoryCounts[cat] = 0);
 
     fileData.pairs.forEach(pair => {
-        // 1. Defect biasa (dari checkbox)
+        // === 1. HITUNG OTHER DEFECTS SEKALI SAJA ===
+        if ((pair.defects || []).includes('Other Defects') && pair.otherDefects) {
+            const otherCount = pair.otherDefects.length;
+            categoryCounts['Other Defects'] += otherCount; // Hanya sekali!
+        }
+
+        // === 2. HITUNG DEFECT BIASA (kecuali 'Other Defects') ===
         (pair.defects || []).forEach(defect => {
-            if (defect === 'Other Defects') {
-                // Jika user centang "Other Defects", hitung jumlah detail yang diinput
-                const otherCount = (pair.otherDefects || []).length;
-                categoryCounts['Other Defects'] += otherCount;
-            } else {
-                // Defect biasa → cari kategorinya
+            if (defect !== 'Other Defects') {
                 const category = defectToCategoryMap[defect];
                 if (category && categoryCounts.hasOwnProperty(category)) {
                     categoryCounts[category]++;
                 }
             }
         });
-
-        // 2. Input manual (otherDefects) → masuk ke "Other Defects"
-        // Tapi: hanya jika "Other Defects" DICENTANG (pair.defects includes 'Other Defects')
-        if ((pair.defects || []).includes('Other Defects')) {
-            const otherCount = (pair.otherDefects || []).length;
-            categoryCounts['Other Defects'] += otherCount;
-        }
     });
 
     const totalDefects = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
