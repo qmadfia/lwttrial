@@ -971,31 +971,18 @@ Object.entries(defectCategories).forEach(([category, defects]) => {
 // Tambahkan mapping untuk "Other Defects" → masuk ke kategori "Other Defects"
 defectToCategoryMap['Other Defects'] = 'Other Defects'; // placeholder, akan diganti nanti
 /**
- * Generate Summary Sheet Data - Dengan Kategori
- */
-/**
- * Generate Summary Sheet Data - Struktur tetap: Date, Style, Model, [Defect1..DefectN], Total
- * TAPI: Semua defect (termasuk otherDefects) masuk ke kolom kategori masing-masing
- */
-/**
- * Generate Summary Sheet Data - FIXED: otherDefects masuk ke kategori "Other Defects"
- */
-/**
- * Generate Summary Sheet Data - FIXED: otherDefects dihitung sesuai jumlah input
- */
-/**
- * Generate Summary Sheet Data - FIXED: otherDefects masuk ke kategori "Other Defects"
- */
-/**
- * Generate Summary Sheet Data - FINAL: otherDefects dihitung SEKALI SAJA
- */
-/**
  * Generate Summary Sheet Data - FIXED: otherDefects tidak dihitung ganda
+ */
+/**
+ * Generate Summary Sheet Data - FIXED: Tambah kolom "Defect detail for other"
  */
 function generateSummaryData(fileData) {
     const categories = Object.keys(defectCategories);
     const categoryCounts = {};
     categories.forEach(cat => categoryCounts[cat] = 0);
+
+    // Objek untuk menghitung frekuensi masing-masing defect di kategori "Other Defects"
+    const otherDefectsFrequency = {};
 
     fileData.pairs.forEach(pair => {
         // 1. Defect biasa (dari checkbox) - KECUALI "Other Defects"
@@ -1006,6 +993,11 @@ function generateSummaryData(fileData) {
                 if (category && categoryCounts.hasOwnProperty(category)) {
                     categoryCounts[category]++;
                 }
+                
+                // Jika defect ini termasuk kategori "Other Defects", hitung frekuensinya
+                if (category === 'Other Defects') {
+                    otherDefectsFrequency[defect] = (otherDefectsFrequency[defect] || 0) + 1;
+                }
             }
         });
 
@@ -1013,18 +1005,40 @@ function generateSummaryData(fileData) {
         if ((pair.defects || []).includes('Other Defects')) {
             const otherCount = (pair.otherDefects || []).length;
             categoryCounts['Other Defects'] += otherCount;
+            
+            // Hitung frekuensi untuk setiap detail manual
+            (pair.otherDefects || []).forEach(detail => {
+                otherDefectsFrequency[detail] = (otherDefectsFrequency[detail] || 0) + 1;
+            });
         }
     });
 
     const totalDefects = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
 
-    const headers = ['Date', 'Style Number', 'Model', ...categories, 'Total Defect'];
+    // Cari defect dengan frekuensi tertinggi di kategori "Other Defects"
+    let maxFrequency = 0;
+    let topDefects = [];
+    
+    Object.entries(otherDefectsFrequency).forEach(([defect, count]) => {
+        if (count > maxFrequency) {
+            maxFrequency = count;
+            topDefects = [defect];
+        } else if (count === maxFrequency && count > 0) {
+            topDefects.push(defect);
+        }
+    });
+    
+    // Gabungkan defect dengan frekuensi tertinggi
+    const defectDetailForOther = topDefects.length > 0 ? topDefects.join(', ') : '-';
+
+    const headers = ['Date', 'Style Number', 'Model', ...categories, 'Total Defect', 'Defect detail for other'];
     const dataRow = [
         fileData.header.date,
         fileData.header.styleNumber,
         fileData.header.model,
         ...categories.map(cat => categoryCounts[cat]),
-        totalDefects
+        totalDefects,
+        defectDetailForOther
     ];
 
     return [headers, dataRow];
