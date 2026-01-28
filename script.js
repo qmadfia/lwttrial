@@ -1029,6 +1029,7 @@ defectCounts['Moldy'],
 defectCounts['No-sew Quality'],
 defectCounts['Plate/shank damage'],
 defectCounts['Size mis-match/ Wrong size/Wrong C/O label/Missing UPC label'],
+defectCounts['Stitching (missing or gaps) - Broken / loose stitched '],
         defectCounts['Other Defects'],
         totalDefects
     ];
