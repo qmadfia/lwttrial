@@ -1,6 +1,6 @@
 /**
  * @file script.js
- * @description Main logic for the Line Walk Through application (V4 - With Summary Sheet & Auditor).
+ * @description Main logic for the Line Walk Through application (V5 - With Auto-Save & Auto-Restore).
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Variabel Global dan Referensi DOM
     // =========================================================================
     const STORAGE_KEY = 'lineWalkThroughData';
+    const DRAFT_KEY = 'lineWalkThroughDraft'; // BARU: Key untuk draft data
     const TOTAL_PAIRS = 20;
     let currentModalAction = { onConfirm: null, onCancel: null };
     
@@ -140,19 +141,172 @@ document.addEventListener('DOMContentLoaded', () => {
     
        // TAMBAHAN BARU UNTUK OVERLAY
         loadingOverlay: document.getElementById('loading-overlay'),
-        };
+    };
 
     // =========================================================================
-    // 2. FUNGSI INISIALISASI APLIKASI
+    // 2. FUNGSI AUTO-SAVE & AUTO-RESTORE (BARU)
     // =========================================================================
     
-async function initializeApp() {
-    populateLineDropdown();
-    generateDataEntryRows();
-    setupEventListeners();
-    const existingData = await getFromDB();
-    await renderSavedFilesOptimized(existingData, null);
-}
+    /**
+     * Menyimpan draft data ke localStorage
+     */
+    function saveDraftToLocalStorage() {
+        try {
+            const draftData = {
+                form: {
+                    auditor: DOMElements.auditor.value,
+                    validationCategory: DOMElements.validationCategory.value,
+                    styleNumber: DOMElements.styleNumberInput.value,
+                    model: DOMElements.model.value,
+                    line: DOMElements.line.value
+                },
+                pairs: []
+            };
+
+            // Ambil data dari setiap row
+            DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
+                const pairData = {
+                    pairNumber: tr.dataset.pairNumber,
+                    status: tr.querySelector('.status-select').value,
+                    defects: tr.dataset.defects || '[]',
+                    otherDefects: tr.dataset.otherDefects || '[]',
+                    photos: tr.dataset.photos || '[]'
+                };
+                draftData.pairs.push(pairData);
+            });
+
+            localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+            console.log('Draft auto-saved to localStorage');
+        } catch (error) {
+            console.error('Failed to save draft:', error);
+        }
+    }
+
+    /**
+     * Memulihkan draft data dari localStorage
+     */
+    function restoreDraftFromLocalStorage() {
+        try {
+            const savedDraft = localStorage.getItem(DRAFT_KEY);
+            if (!savedDraft) {
+                console.log('No draft found in localStorage');
+                return;
+            }
+
+            const draftData = JSON.parse(savedDraft);
+
+            // Restore form data
+            if (draftData.form) {
+                DOMElements.auditor.value = draftData.form.auditor || '';
+                DOMElements.validationCategory.value = draftData.form.validationCategory || '';
+                DOMElements.styleNumberInput.value = draftData.form.styleNumber || '';
+                DOMElements.model.value = draftData.form.model || '';
+                DOMElements.line.value = draftData.form.line || '';
+            }
+
+            // Restore pairs data
+            if (draftData.pairs && draftData.pairs.length > 0) {
+                draftData.pairs.forEach(pairData => {
+                    const tr = DOMElements.dataEntryBody.querySelector(`tr[data-pair-number="${pairData.pairNumber}"]`);
+                    if (!tr) return;
+
+                    // Restore status
+                    const statusSelect = tr.querySelector('.status-select');
+                    statusSelect.value = pairData.status || '';
+                    
+                    // Trigger perubahan status untuk update UI
+                    if (statusSelect.value) {
+                        statusSelect.classList.add('status-selected');
+                        statusSelect.classList.toggle('status-ok', statusSelect.value === 'OK');
+                        statusSelect.classList.toggle('status-ng', statusSelect.value === 'NG');
+                    }
+
+                    // Restore defects
+                    tr.dataset.defects = pairData.defects;
+                    tr.dataset.otherDefects = pairData.otherDefects;
+
+                    // Restore photos
+                    tr.dataset.photos = pairData.photos;
+
+                    // Update UI untuk defect container
+                    const defectContainer = tr.querySelector('.defect-input-container');
+                    const addPhotoButton = tr.querySelector('.add-photo-btn');
+                    
+                    if (statusSelect.value === 'NG') {
+                        defectContainer.classList.replace('disabled', 'enabled');
+                        defectContainer.querySelector('.placeholder-text').textContent = 'Klik untuk pilih defect...';
+                        addPhotoButton.style.display = 'block';
+                    }
+
+                    // Update tampilan defect tags dan photo gallery
+                    updateDefectTags(tr);
+                    updatePhotoGallery(tr);
+                });
+            }
+
+            console.log('Draft restored from localStorage');
+            
+            // Tampilkan notifikasi bahwa draft telah dipulihkan
+            showDraftRestoredNotification();
+        } catch (error) {
+            console.error('Failed to restore draft:', error);
+        }
+    }
+
+    /**
+     * Menghapus draft dari localStorage
+     */
+    function clearDraftFromLocalStorage() {
+        try {
+            localStorage.removeItem(DRAFT_KEY);
+            console.log('Draft cleared from localStorage');
+        } catch (error) {
+            console.error('Failed to clear draft:', error);
+        }
+    }
+
+    /**
+     * Menampilkan notifikasi bahwa draft telah dipulihkan
+     */
+    function showDraftRestoredNotification() {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            z-index: 10000;
+            font-size: 14px;
+            animation: slideIn 0.3s ease-out;
+        `;
+        notification.textContent = '✓ Data sebelumnya telah dipulihkan';
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.style.animation = 'slideOut 0.3s ease-out';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+
+    // =========================================================================
+    // 3. FUNGSI INISIALISASI APLIKASI
+    // =========================================================================
+    
+    async function initializeApp() {
+        populateLineDropdown();
+        generateDataEntryRows();
+        
+        // BARU: Restore draft sebelum setup event listeners
+        restoreDraftFromLocalStorage();
+        
+        setupEventListeners();
+        const existingData = await getFromDB();
+        await renderSavedFilesOptimized(existingData, null);
+    }
 
     function populateLineDropdown() {
         const lineSelect = DOMElements.line;
@@ -202,7 +356,7 @@ async function initializeApp() {
     }
 
     // =========================================================================
-    // 3. PENGATURAN EVENT LISTENERS
+    // 4. PENGATURAN EVENT LISTENERS
     // =========================================================================
     
     function setupEventListeners() {
@@ -222,10 +376,35 @@ async function initializeApp() {
         DOMElements.modalCancelBtn.addEventListener('click', () => currentModalAction.onCancel?.());
         
         DOMElements.savedFilesList.addEventListener('click', handleSavedFilesActions);
+
+        // BARU: Event listeners untuk auto-save
+        setupAutoSaveListeners();
+    }
+
+    /**
+     * BARU: Setup event listeners untuk auto-save
+     */
+    function setupAutoSaveListeners() {
+        // Auto-save saat form berubah
+        DOMElements.auditor.addEventListener('input', saveDraftToLocalStorage);
+        DOMElements.validationCategory.addEventListener('change', saveDraftToLocalStorage);
+        DOMElements.styleNumberInput.addEventListener('input', saveDraftToLocalStorage);
+        DOMElements.model.addEventListener('input', saveDraftToLocalStorage);
+        DOMElements.line.addEventListener('change', saveDraftToLocalStorage);
+
+        // Auto-save saat tabel berubah (dengan debounce)
+        let saveTimeout;
+        const debouncedSave = () => {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(saveDraftToLocalStorage, 500);
+        };
+
+        DOMElements.dataEntryBody.addEventListener('change', debouncedSave);
+        DOMElements.dataEntryBody.addEventListener('input', debouncedSave);
     }
 
     // =========================================================================
-    // 4. HANDLER FORM INPUT (Autocomplete)
+    // 5. HANDLER FORM INPUT (Autocomplete)
     // =========================================================================
     
     function handleAutocompleteInput(e) {
@@ -260,11 +439,14 @@ async function initializeApp() {
             DOMElements.styleNumberInput.value = selectedStyle;
             DOMElements.model.value = styleModelMap[selectedStyle] || '';
             DOMElements.autocompleteResults.style.display = 'none';
+            
+            // BARU: Auto-save setelah select
+            saveDraftToLocalStorage();
         }
     }
 
     // =========================================================================
-    // 5. HANDLER TABEL (Status, Defect, Foto)
+    // 6. HANDLER TABEL (Status, Defect, Foto)
     // =========================================================================
 
     function handleTableChange(e) {
@@ -290,6 +472,9 @@ async function initializeApp() {
                 resetDefectsForRow(tr);
                 resetPhotosForRow(tr);
             }
+            
+            // BARU: Auto-save setelah perubahan status
+            saveDraftToLocalStorage();
         }
 
         if (target.classList.contains('hidden-file-input')) {
@@ -317,7 +502,7 @@ async function initializeApp() {
                 title: 'Konfirmasi Hapus',
                 body: `<p>Hapus data inspeksi <strong>Pair #${tr.dataset.pairNumber}</strong>?</p>`,
                 confirmText: 'Ya, Hapus',
-                onConfirm: () => { resetRow(tr); hideModal(); }
+                onConfirm: () => { resetRow(tr); hideModal(); saveDraftToLocalStorage(); } // BARU: Auto-save setelah hapus
             });
         } 
         else if (target.closest('.defect-input-container.enabled')) {
@@ -325,84 +510,87 @@ async function initializeApp() {
         }
     }
 
-function handleImageUpload(e) {
-    const files = e.target.files;
-    if (!files.length) return;
-    const tr = e.target.closest('tr');
+    function handleImageUpload(e) {
+        const files = e.target.files;
+        if (!files.length) return;
+        const tr = e.target.closest('tr');
 
-    // Periksa batas foto di awal
-    let currentPhotos = JSON.parse(tr.dataset.photos || '[]');
-    if (currentPhotos.length >= MAX_PHOTOS_PER_PAIR) {
-        alert(`Jumlah ${MAX_PHOTOS_PER_PAIR} limit foto sudah terpenuhi. Hapus salah satu foto jika Anda ingin mengunggah foto lain.`);
-        e.target.value = ''; // Reset input file
-        return;
-    }
-
-    // Hitung berapa slot yang tersedia
-    const availableSlots = MAX_PHOTOS_PER_PAIR - currentPhotos.length;
-    const filesToProcess = Array.from(files).slice(0, availableSlots);
-
-    if (filesToProcess.length < files.length) {
-        alert(`Hanya ${filesToProcess.length} foto yang dapat diunggah karena batas maksimum adalah ${MAX_PHOTOS_PER_PAIR} foto per pair. Hapus foto yang ada untuk mengunggah lebih banyak.`);
-    }
-
-    // Proses file yang diizinkan
-    const processPromises = filesToProcess.map(async (file) => {
-        // Validasi tipe file
-        if (!file.type.startsWith('image/')) {
-            alert(`File ${file.name} bukan gambar. Hanya file gambar yang diperbolehkan.`);
-            return null;
+        // Periksa batas foto di awal
+        let currentPhotos = JSON.parse(tr.dataset.photos || '[]');
+        if (currentPhotos.length >= MAX_PHOTOS_PER_PAIR) {
+            alert(`Jumlah ${MAX_PHOTOS_PER_PAIR} limit foto sudah terpenuhi. Hapus salah satu foto jika Anda ingin mengunggah foto lain.`);
+            e.target.value = ''; // Reset input file
+            return;
         }
 
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-                let base64String = event.target.result;
+        // Hitung berapa slot yang tersedia
+        const availableSlots = MAX_PHOTOS_PER_PAIR - currentPhotos.length;
+        const filesToProcess = Array.from(files).slice(0, availableSlots);
 
-                // Jika ukuran file asli > MAX_FILE_SIZE, coba kompresi
-                if (file.size > MAX_FILE_SIZE) {
-                    try {
-                        console.log(`Mengompresi ${file.name}...`);
-                        base64String = await compressImage(base64String);
-                        // Periksa ukuran setelah kompresi (estimasi)
-                        const compressedSize = (base64String.length * 3) / 4; // Approx size
-                        if (compressedSize > MAX_FILE_SIZE) {
-                            alert(`File ${file.name} masih terlalu besar setelah kompresi. Maksimal 5MB.`);
+        if (filesToProcess.length < files.length) {
+            alert(`Hanya ${filesToProcess.length} foto yang dapat diunggah karena batas maksimum adalah ${MAX_PHOTOS_PER_PAIR} foto per pair. Hapus foto yang ada untuk mengunggah lebih banyak.`);
+        }
+
+        // Proses file yang diizinkan
+        const processPromises = filesToProcess.map(async (file) => {
+            // Validasi tipe file
+            if (!file.type.startsWith('image/')) {
+                alert(`File ${file.name} bukan gambar. Hanya file gambar yang diperbolehkan.`);
+                return null;
+            }
+
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = async (event) => {
+                    let base64String = event.target.result;
+
+                    // Jika ukuran file asli > MAX_FILE_SIZE, coba kompresi
+                    if (file.size > MAX_FILE_SIZE) {
+                        try {
+                            console.log(`Mengompresi ${file.name}...`);
+                            base64String = await compressImage(base64String);
+                            // Periksa ukuran setelah kompresi (estimasi)
+                            const compressedSize = (base64String.length * 3) / 4; // Approx size
+                            if (compressedSize > MAX_FILE_SIZE) {
+                                alert(`File ${file.name} masih terlalu besar setelah kompresi. Maksimal 5MB.`);
+                                resolve(null);
+                                return;
+                            }
+                            alert(`File ${file.name} berhasil dikompresi.`);
+                        } catch (error) {
+                            alert(`Gagal mengompresi ${file.name}. ${error.message}`);
                             resolve(null);
                             return;
                         }
-                        alert(`File ${file.name} berhasil dikompresi.`);
-                    } catch (error) {
-                        alert(`Gagal mengompresi ${file.name}. ${error.message}`);
-                        resolve(null);
-                        return;
                     }
+
+                    resolve({ name: file.name, data: base64String });
+                };
+                reader.onerror = () => {
+                    alert(`Gagal membaca file ${file.name}. Pastikan file adalah gambar valid dan tidak rusak.`);
+                    resolve(null);
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+
+        // Tunggu semua file selesai diproses
+        Promise.all(processPromises).then((results) => {
+            let photos = JSON.parse(tr.dataset.photos || '[]');
+            results.forEach(result => {
+                if (result) {
+                    photos.push(result);
                 }
-
-                resolve({ name: file.name, data: base64String });
-            };
-            reader.onerror = () => {
-                alert(`Gagal membaca file ${file.name}. Pastikan file adalah gambar valid dan tidak rusak.`);
-                resolve(null);
-            };
-            reader.readAsDataURL(file);
+            });
+            tr.dataset.photos = JSON.stringify(photos);
+            updatePhotoGallery(tr);
+            
+            // BARU: Auto-save setelah upload foto
+            saveDraftToLocalStorage();
         });
-    });
 
-    // Tunggu semua file selesai diproses
-    Promise.all(processPromises).then((results) => {
-        let photos = JSON.parse(tr.dataset.photos || '[]');
-        results.forEach(result => {
-            if (result) {
-                photos.push(result);
-            }
-        });
-        tr.dataset.photos = JSON.stringify(photos);
-        updatePhotoGallery(tr);
-    });
-
-    e.target.value = '';
-}
+        e.target.value = '';
+    }
 
     function updatePhotoGallery(tr) {
         const gallery = tr.querySelector('.photo-gallery');
@@ -426,6 +614,9 @@ function handleImageUpload(e) {
         photos.splice(index, 1);
         tr.dataset.photos = JSON.stringify(photos);
         updatePhotoGallery(tr);
+        
+        // BARU: Auto-save setelah hapus foto
+        saveDraftToLocalStorage();
     }
     
     function resetRow(tr) {
@@ -440,153 +631,145 @@ function handleImageUpload(e) {
         resetPhotosForRow(tr);
     }
 
-function resetDefectsForRow(tr) {
-    tr.dataset.defects = '[]';
-    tr.dataset.otherDefects = '[]'; // TAMBAHKAN BARIS INI
-    updateDefectTags(tr);
-}
+    function resetDefectsForRow(tr) {
+        tr.dataset.defects = '[]';
+        tr.dataset.otherDefects = '[]';
+        updateDefectTags(tr);
+    }
 
     function resetPhotosForRow(tr) {
         tr.dataset.photos = '[]';
         updatePhotoGallery(tr);
     }
 
-function showDefectSelectionModal(tr) {
-    const currentDefects = JSON.parse(tr.dataset.defects || '[]');
-    const currentOtherDefects = JSON.parse(tr.dataset.otherDefects || '[]'); // Data input manual
-    
-    let optionsHTML = defectTypes.map(defect => {
-        const isOther = defect === 'Other Defects';
-        const isChecked = isOther ? currentOtherDefects.length > 0 : currentDefects.includes(defect);
+    function showDefectSelectionModal(tr) {
+        const currentDefects = JSON.parse(tr.dataset.defects || '[]');
+        const currentOtherDefects = JSON.parse(tr.dataset.otherDefects || '[]');
         
-        return `
-            <label>
-                <input type="checkbox" value="${defect}" ${isChecked ? 'checked' : ''}>
-                ${defect}
-            </label>
-        `;
-    }).join('');
-    
-    // Input field untuk Other Defects
-    const otherDefectsInputHTML = `
-        <div id="other-defects-input-container" style="display: ${currentOtherDefects.length > 0 ? 'block' : 'none'}; margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background-color: #f9f9f9;">
-            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Detail Other Defects:</label>
-            <input type="text" id="other-defects-detail" class="search-bar" placeholder="Ketik detail defect (contoh: Hairy, Outsole Kotor, dll)" value="${currentOtherDefects.join(', ')}" style="margin-bottom: 0;">
-            <small style="display: block; margin-top: 5px; color: #666;">Pisahkan dengan koma jika lebih dari satu defect</small>
-        </div>
-    `;
-    
-    const modalBodyHTML = `
-        <div id="defect-selection-modal">
-            <input type="text" class="search-bar" placeholder="Cari tipe defect...">
-            <div class="options-container">${optionsHTML}</div>
-            ${otherDefectsInputHTML}
-        </div>`;
-    
-    showModal({
-        title: `Pilih Defect untuk Pair #${tr.dataset.pairNumber}`,
-        body: modalBodyHTML,
-        confirmText: 'Simpan Pilihan',
-        onConfirm: () => {
-            const selected = [];
-            const otherDefectDetails = [];
+        let optionsHTML = defectTypes.map(defect => {
+            const isOther = defect === 'Other Defects';
+            const isChecked = isOther ? currentOtherDefects.length > 0 : currentDefects.includes(defect);
             
-            document.querySelectorAll('#defect-selection-modal input[type="checkbox"]:checked').forEach(cb => {
-                if (cb.value === 'Other Defects') {
-                    // Ambil detail dari input manual
-                    const detailInput = document.getElementById('other-defects-detail').value.trim();
-                    if (detailInput) {
-                        // Split berdasarkan koma dan trim setiap item
-                        const details = detailInput.split(',').map(d => d.trim()).filter(d => d);
-                        otherDefectDetails.push(...details);
+            return `
+                <label>
+                    <input type="checkbox" value="${defect}" ${isChecked ? 'checked' : ''}>
+                    ${defect}
+                </label>
+            `;
+        }).join('');
+        
+        const otherDefectsInputHTML = `
+            <div id="other-defects-input-container" style="display: ${currentOtherDefects.length > 0 ? 'block' : 'none'}; margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background-color: #f9f9f9;">
+                <label style="display: block; margin-bottom: 5px; font-weight: bold;">Detail Other Defects:</label>
+                <input type="text" id="other-defects-detail" class="search-bar" placeholder="Ketik detail defect (contoh: Hairy, Outsole Kotor, dll)" value="${currentOtherDefects.join(', ')}" style="margin-bottom: 0;">
+                <small style="display: block; margin-top: 5px; color: #666;">Pisahkan dengan koma jika lebih dari satu defect</small>
+            </div>
+        `;
+        
+        const modalBodyHTML = `
+            <div id="defect-selection-modal">
+                <input type="text" class="search-bar" placeholder="Cari tipe defect...">
+                <div class="options-container">${optionsHTML}</div>
+                ${otherDefectsInputHTML}
+            </div>`;
+        
+        showModal({
+            title: `Pilih Defect untuk Pair #${tr.dataset.pairNumber}`,
+            body: modalBodyHTML,
+            confirmText: 'Simpan Pilihan',
+            onConfirm: () => {
+                const selected = [];
+                const otherDefectDetails = [];
+                
+                document.querySelectorAll('#defect-selection-modal input[type="checkbox"]:checked').forEach(cb => {
+                    if (cb.value === 'Other Defects') {
+                        const detailInput = document.getElementById('other-defects-detail').value.trim();
+                        if (detailInput) {
+                            const details = detailInput.split(',').map(d => d.trim()).filter(d => d);
+                            otherDefectDetails.push(...details);
+                            selected.push(cb.value);
+                        }
+                    } else {
                         selected.push(cb.value);
                     }
-                } else {
-                    selected.push(cb.value);
+                });
+                
+                tr.dataset.defects = JSON.stringify(selected);
+                tr.dataset.otherDefects = JSON.stringify(otherDefectDetails);
+                updateDefectTags(tr);
+                hideModal();
+                
+                // BARU: Auto-save setelah pilih defect
+                saveDraftToLocalStorage();
+            },
+        });
+        
+        document.querySelector('#defect-selection-modal .search-bar').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            document.querySelectorAll('#defect-selection-modal label').forEach(label => {
+                const matches = label.textContent.trim().toLowerCase().includes(searchTerm);
+                label.style.display = matches ? 'flex' : 'none';
+            });
+        });
+        
+        document.querySelectorAll('#defect-selection-modal input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', (e) => {
+                if (e.target.value === 'Other Defects') {
+                    const inputContainer = document.getElementById('other-defects-input-container');
+                    inputContainer.style.display = e.target.checked ? 'block' : 'none';
+                    
+                    if (!e.target.checked) {
+                        document.getElementById('other-defects-detail').value = '';
+                    }
+                }
+            });
+        });
+    }
+
+    function updateDefectTags(tr) {
+        const wrapper = tr.querySelector('.defect-tags-wrapper');
+        const defects = JSON.parse(tr.dataset.defects || '[]');
+        const otherDefects = JSON.parse(tr.dataset.otherDefects || '[]');
+        wrapper.innerHTML = '';
+        
+        if (defects.length > 0 || otherDefects.length > 0) {
+            defects.forEach(defect => {
+                if (defect !== 'Other Defects') {
+                    const tag = document.createElement('span');
+                    tag.className = 'defect-tag';
+                    tag.textContent = defect;
+                    wrapper.appendChild(tag);
                 }
             });
             
-            tr.dataset.defects = JSON.stringify(selected);
-            tr.dataset.otherDefects = JSON.stringify(otherDefectDetails);
-            updateDefectTags(tr);
-            hideModal();
-        },
-    });
-    
-    // Event listener untuk search bar
-    document.querySelector('#defect-selection-modal .search-bar').addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        document.querySelectorAll('#defect-selection-modal label').forEach(label => {
-            const matches = label.textContent.trim().toLowerCase().includes(searchTerm);
-            label.style.display = matches ? 'flex' : 'none';
-        });
-    });
-    
-    // Event listener untuk checkbox "Other Defects"
-    document.querySelectorAll('#defect-selection-modal input[type="checkbox"]').forEach(checkbox => {
-        checkbox.addEventListener('change', (e) => {
-            if (e.target.value === 'Other Defects') {
-                const inputContainer = document.getElementById('other-defects-input-container');
-                inputContainer.style.display = e.target.checked ? 'block' : 'none';
-                
-                // Clear input jika unchecked
-                if (!e.target.checked) {
-                    document.getElementById('other-defects-detail').value = '';
-                }
-            }
-        });
-    });
-}
-
-function updateDefectTags(tr) {
-    const wrapper = tr.querySelector('.defect-tags-wrapper');
-    const defects = JSON.parse(tr.dataset.defects || '[]');
-    const otherDefects = JSON.parse(tr.dataset.otherDefects || '[]');
-    wrapper.innerHTML = '';
-    
-    if (defects.length > 0 || otherDefects.length > 0) {
-        // Tampilkan defect biasa
-        defects.forEach(defect => {
-            if (defect !== 'Other Defects') {
+            otherDefects.forEach(detail => {
                 const tag = document.createElement('span');
                 tag.className = 'defect-tag';
-                tag.textContent = defect;
+                tag.textContent = detail;
+                tag.style.backgroundColor = '#ff9800';
                 wrapper.appendChild(tag);
-            }
-        });
-        
-        // Tampilkan detail Other Defects
-        otherDefects.forEach(detail => {
-            const tag = document.createElement('span');
-            tag.className = 'defect-tag';
-            tag.textContent = detail;
-            tag.style.backgroundColor = '#ff9800'; // Warna berbeda untuk Other Defects
-            wrapper.appendChild(tag);
-        });
-    } else {
-        const placeholder = document.createElement('span');
-        placeholder.className = 'placeholder-text';
-        placeholder.textContent = tr.querySelector('.status-select').value === 'NG' ? 'Klik untuk pilih defect...' : "Pilih 'NG' untuk mengisi";
-        wrapper.appendChild(placeholder);
+            });
+        } else {
+            const placeholder = document.createElement('span');
+            placeholder.className = 'placeholder-text';
+            placeholder.textContent = tr.querySelector('.status-select').value === 'NG' ? 'Klik untuk pilih defect...' : "Pilih 'NG' untuk mengisi";
+            wrapper.appendChild(placeholder);
+        }
     }
-}
     
     // =========================================================================
-    // 6. FUNGSI SIMPAN & MANAJEMEN DATA LOKAL
+    // 7. FUNGSI SIMPAN & MANAJEMEN DATA LOKAL
     // =========================================================================
 
     function handleSaveValidation() {
-        // Validasi Auditor
         if (!DOMElements.auditor.value.trim()) {
             return alert('Harap isi nama Auditor.');
         }
         
-        // Validasi Header
         if (!DOMElements.validationCategory.value || !DOMElements.styleNumberInput.value || !DOMElements.line.value) {
             return alert('Harap lengkapi semua informasi di bagian atas (Kategori, Style, Line).');
         }
         
-        // Validasi NG tanpa Defect
         for (const tr of DOMElements.dataEntryBody.querySelectorAll('tr')) {
             const status = tr.querySelector('.status-select').value;
             const defects = JSON.parse(tr.dataset.defects || '[]');
@@ -595,7 +778,6 @@ function updateDefectTags(tr) {
             }
         }
         
-        // Validasi Kelengkapan
         const inspectedCount = Array.from(document.querySelectorAll('.status-select')).filter(s => s.value !== "").length;
         if (inspectedCount < TOTAL_PAIRS) {
             showModal({
@@ -609,90 +791,82 @@ function updateDefectTags(tr) {
         }
     }
 
-// GANTI FUNGSI saveData() ANDA (YANG LAMA) DENGAN KODE BERIKUT INI:
+    async function saveData() {
+        showLoadingOverlay();
 
-async function saveData() {
-    showLoadingOverlay();
+        try {
+            const now = new Date();
+            const dateStr = now.toISOString().split('T')[0];
+            const timeStr = `${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}-${now.getSeconds().toString().padStart(2, '0')}`;
+            
+            const headerData = {
+                date: dateStr,
+                auditor: DOMElements.auditor.value.trim(),
+                validationCategory: DOMElements.validationCategory.value,
+                styleNumber: DOMElements.styleNumberInput.value,
+                model: DOMElements.model.value,
+                line: DOMElements.line.value
+            };
 
-    try {
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
-        const timeStr = `${now.getHours().toString().padStart(2, '0')}-${now.getMinutes().toString().padStart(2, '0')}-${now.getSeconds().toString().padStart(2, '0')}`;
-        
-        const headerData = {
-            date: dateStr,
-            auditor: DOMElements.auditor.value.trim(),
-            validationCategory: DOMElements.validationCategory.value,
-            styleNumber: DOMElements.styleNumberInput.value,
-            model: DOMElements.model.value,
-            line: DOMElements.line.value
-        };
+            const pairsData = Array.from(DOMElements.dataEntryBody.querySelectorAll('tr')).map(tr => {
+                try {
+                    const dataset = tr.dataset;
+                    return {
+                        pairNumber: parseInt(dataset.pairNumber),
+                        status: tr.querySelector('.status-select').value,
+                        defects: dataset.defects ? JSON.parse(dataset.defects) : [],
+                        otherDefects: dataset.otherDefects ? JSON.parse(dataset.otherDefects) : [],
+                        photos: dataset.photos ? JSON.parse(dataset.photos) : []
+                    };
+                } catch (error) {
+                    console.error(`Error parsing data for pair ${tr.dataset.pairNumber}:`, error);
+                    alert(`Error pada pair ${tr.dataset.pairNumber}: ${error.message}. Data tidak dapat disimpan.`);
+                    throw error;
+                }
+            });
 
-        // Optimasi: Kumpulkan data dalam satu pass dengan error handling
-const pairsData = Array.from(DOMElements.dataEntryBody.querySelectorAll('tr')).map(tr => {
-    try {
-        const dataset = tr.dataset;
-        return {
-            pairNumber: parseInt(dataset.pairNumber),
-            status: tr.querySelector('.status-select').value,
-            defects: dataset.defects ? JSON.parse(dataset.defects) : [],
-            otherDefects: dataset.otherDefects ? JSON.parse(dataset.otherDefects) : [], // TAMBAHKAN BARIS INI
-            photos: dataset.photos ? JSON.parse(dataset.photos) : []
-        };
-    } catch (error) {
-        console.error(`Error parsing data for pair ${tr.dataset.pairNumber}:`, error);
-        alert(`Error pada pair ${tr.dataset.pairNumber}: ${error.message}. Data tidak dapat disimpan.`);
-        throw error;
-    }
-});
+            const fileId = `lwt_${now.getTime()}`;
+            const fileName = `LWT-${headerData.validationCategory || 'DATA'}-${dateStr}-${timeStr}`;
+            const fileData = { id: fileId, name: fileName, header: headerData, pairs: pairsData };
 
-        const fileId = `lwt_${now.getTime()}`;
-        const fileName = `LWT-${headerData.validationCategory || 'DATA'}-${dateStr}-${timeStr}`;
-        const fileData = { id: fileId, name: fileName, header: headerData, pairs: pairsData };
+            const db = await openDB();
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
 
-        // Optimasi: Gabungkan transaksi IndexedDB
-        const db = await openDB();
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
+            const existingDataRequest = store.getAll();
+            const existingData = await new Promise((resolve, reject) => {
+                existingDataRequest.onsuccess = () => resolve(existingDataRequest.result);
+                existingDataRequest.onerror = () => reject(existingDataRequest.error);
+            });
 
-        // Periksa batas file dan hapus yang lama dalam satu transaksi
-        const existingDataRequest = store.getAll();
-        const existingData = await new Promise((resolve, reject) => {
-            existingDataRequest.onsuccess = () => resolve(existingDataRequest.result);
-            existingDataRequest.onerror = () => reject(existingDataRequest.error);
-        });
+            if (existingData.length >= 10) {
+                const oldest = existingData.reduce((min, item) => item.id < min.id ? item : min);
+                store.delete(oldest.id);
+                existingData.splice(existingData.indexOf(oldest), 1);
+            }
 
-        if (existingData.length >= 10) {
-            const oldest = existingData.reduce((min, item) => item.id < min.id ? item : min);
-            store.delete(oldest.id);
-            existingData.splice(existingData.indexOf(oldest), 1);
+            store.put(fileData);
+
+            await new Promise((resolve, reject) => {
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = () => reject(transaction.error);
+            });
+
+            alert('Data berhasil disimpan!');
+
+            resetFullForm();
+            
+            // BARU: Hapus draft setelah data berhasil disimpan
+            clearDraftFromLocalStorage();
+
+            await renderSavedFilesOptimized(existingData, fileData);
+        } catch (error) {
+            console.error('Gagal menyimpan data:', error);
+            alert(`Gagal menyimpan data: ${error.message}`);
+        } finally {
+            hideLoadingOverlay();
         }
-
-        // Simpan data baru
-        store.put(fileData);
-
-        // Tunggu transaksi selesai
-        await new Promise((resolve, reject) => {
-            transaction.oncomplete = () => resolve();
-            transaction.onerror = () => reject(transaction.error);
-        });
-
-        // Notifikasi sukses
-        alert('Data berhasil disimpan!');
-
-        // Reset form
-        resetFullForm();
-
-        // Optimasi: Render ulang dengan DOM diffing sederhana
-        await renderSavedFilesOptimized(existingData, fileData);
-    } catch (error) {
-        console.error('Gagal menyimpan data:', error);
-        alert(`Gagal menyimpan data: ${error.message}`);
-    } finally {
-        hideLoadingOverlay();
     }
-}
-
     
     function resetFullForm() {
         DOMElements.auditor.value = '';
@@ -703,403 +877,280 @@ const pairsData = Array.from(DOMElements.dataEntryBody.querySelectorAll('tr')).m
         DOMElements.dataEntryBody.querySelectorAll('tr').forEach(resetRow);
     }
     
-async function handleSavedFilesActions(e) {
-    const target = e.target;
-    const fileId = target.dataset.id;
-    if (!fileId) return;
+    async function handleSavedFilesActions(e) {
+        const target = e.target;
+        const fileId = target.dataset.id;
+        if (!fileId) return;
 
-    if (target.classList.contains('download-btn')) {
-        const fileData = (await getFromDB()).find(item => item.id === fileId);
-        if (!fileData) {
-            // Hilangkan popup, cukup refresh daftar
-            const existingData = await getFromDB();
-            await renderSavedFilesOptimized(existingData, null);
-            return;
-        }
-        try {
-            await handleDownload(fileData);
-        } catch (error) {
-            console.error('Error saat download:', error);
-            alert(`Gagal memulai download: ${error.message}`);
-        }
-    } else if (target.classList.contains('delete-btn')) {
-        showModal({
-            title: 'Konfirmasi Hapus File',
-            body: `<p>Apakah Anda yakin ingin menghapus file ini secara permanen?</p>`,
-            confirmText: 'Ya, Hapus',
-            onConfirm: async () => {
-                await deleteFromDB(fileId);
+        if (target.classList.contains('download-btn')) {
+            const fileData = (await getFromDB()).find(item => item.id === fileId);
+            if (!fileData) {
                 const existingData = await getFromDB();
                 await renderSavedFilesOptimized(existingData, null);
-                hideModal();
+                return;
             }
-        });
-    }
-}
-
-async function handleDownload(fileData) {
-    showLoadingOverlay();
-
-    try {
-        const zip = new JSZip();
-        const imgFolder = zip.folder("images");
-
-        // ===== SHEET 1: LWT Report =====
-        const excelHeaders = ['Date', 'Auditor', 'Validation Category', 'Style Number', 'Model', 'Line', 'Pair Number', 'OK/NG', 'Photos Attached', 'Defect type 1', 'Defect type 2', 'Defect type 3', 'Defect type 4', 'Defect type 5', 'Defect type 6', 'Defect type 7', 'Defect type 8', 'Defect type 9', 'Defect type 10'];
-        const dataForSheet = [excelHeaders];
-
-        const photoPromises = [];
-        fileData.pairs.forEach(pair => {
-            const photoNames = [];
-            if (pair.photos && pair.photos.length > 0) {
-                pair.photos.forEach((photo, index) => {
-                    const photoName = `Pair-${pair.pairNumber}-Foto-${index + 1}.jpg`;
-                    photoNames.push(photoName);
-                    photoPromises.push({
-                        name: photoName,
-                        data: photo.data.startsWith('data:image') ? photo.data.split(',')[1] : photo.data
-                    });
-                });
+            try {
+                await handleDownload(fileData);
+            } catch (error) {
+                console.error('Error saat download:', error);
+                alert(`Gagal memulai download: ${error.message}`);
             }
-
-            // MODIFIKASI BAGIAN INI - Gabungkan defect biasa dengan Other Defects
-            const allDefects = [];
-            
-            // Tambahkan defect biasa (yang bukan "Other Defects")
-            if (pair.defects && pair.defects.length > 0) {
-                pair.defects.forEach(defect => {
-                    if (defect !== 'Other Defects') {
-                        allDefects.push(defect);
-                    }
-                });
-            }
-            
-            // Tambahkan semua detail Other Defects sebagai "Other Defects"
-            if (pair.otherDefects && pair.otherDefects.length > 0) {
-                pair.otherDefects.forEach(() => {
-                    allDefects.push('Other Defects');
-                });
-            }
-
-            const row = [
-                fileData.header.date,
-                fileData.header.auditor,
-                fileData.header.validationCategory,
-                fileData.header.styleNumber,
-                fileData.header.model,
-                fileData.header.line,
-                pair.pairNumber,
-                pair.status,
-                photoNames.join(', '),
-                ...Array(10).fill('').map((_, i) => allDefects[i] || '')
-            ];
-
-            dataForSheet.push(row);
-        });
-
-        for (const { name, data } of photoPromises) {
-            imgFolder.file(name, data, { base64: true });
-        }
-
-        const ws1 = XLSX.utils.aoa_to_sheet(dataForSheet);
-
-        // ===== SHEET 2: Summary =====
-        const summaryData = generateSummaryData(fileData);
-        const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
-
-        // ===== SHEET 3: Other Defects =====
-        const otherDefectsData = generateOtherDefectsSheet(fileData);
-        const ws3 = XLSX.utils.aoa_to_sheet(otherDefectsData);
-
-        // Buat Workbook dengan 3 sheet
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws1, 'LWT Report');
-        XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
-        XLSX.utils.book_append_sheet(wb, ws3, 'Other Defects');
-
-        const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-        zip.file(`${fileData.name}.xlsx`, excelBuffer);
-
-        const content = await zip.generateAsync({
-            type: "blob",
-            compression: "DEFLATE",
-            compressionOptions: { level: 6 }
-        });
-
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(content);
-        link.download = `${fileData.name}.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    } catch (error) {
-        console.error('Gagal membuat file download:', error);
-        alert(`Gagal membuat file download: ${error.message}`);
-    } finally {
-        hideLoadingOverlay();
-    }
-}
-
-/**
- * Generate Summary Sheet Data
- */
-function generateSummaryData(fileData) {
-    const defectList = [
-'Component alignment (visible or expose component)',
-'Component alignment right versus left ',
-'Cutting/trimming (rubber flash, over triming, component edge; hairy & fraying)',
-'Lacing - Finished shoe lacing ',
-'Midsole shape - less definition, deform and midsole texture',
-'Over cement on Finish shoes',
-'Over cement on Bottom unit',
-'Perforation, laser, or 2nd cutting consistency',
-'Staining/Contamination',
-'Stitching margins and SPI',
-'Thread End',
-'Toe spring',
-'Toe stuffing (shape and placement inside the shoe)',
-'Tongue shape',
-'Wrapping paper',
-'Wrinkling midsole ',
-'Wrinkling Upper',
-'X-Ray',
-'Sockliner Placement - missed position on finished shoes',
-'Painting Quality ',
-'Binding or Folding Quality and consistency',
-'Stockfit part Quality (Placement and fitting)',
-'Airbag Contamination (PU, Painting and cement)',
-'Rat hole',
-'Color migration and color mismatch',
-'Heel, Collar and Toe shape',
-'Hot Knife- Incomplete Hot Knife cutting ',
-'Inner box condition (crushed, wrinkled, color variation, etc.)',
-'Lace loop/pull tab attachment - Broken lace loop/pull tab',
-'Midsole Color/Burning',
-'Midsole - under/over side wall buffing',
-'Emblishment; Quality and molded component definition ',
-'Outsole colors (dam spillover) - Color Bleeding',
-'Over buffing',
-'Rocking (>2mm)',
-'Off center ',
-'UPC label damaged',
-'Yellowing on sole unit',
-'Yellowing on upper',
-'Rubber outsole quality (under cure, double skin, concave)  ',
-'Bond Gap and Delamination',
-'Broken Lace ',
-'Twisted and Inverted stance (banana shoe)',
-'Material tearing/damage',
-'Metal contamination',
-'Moldy',
-'No-sew Quality',
-'Plate/shank damage',
-'Size mis-match/ Wrong size/Wrong C/O label/Missing UPC label',
-'Stitching (missing or gaps) - Broken / loose stitched ',
-        'Other Defects'
-    ];
-
-    const defectCounts = {};
-    defectList.forEach(defect => defectCounts[defect] = 0);
-
-    fileData.pairs.forEach(pair => {
-        if (pair.defects && pair.defects.length > 0) {
-            pair.defects.forEach(defect => {
-                if (defectList.includes(defect)) {
-                    // MODIFIKASI: Untuk Other Defects, hitung jumlah detail yang diinput
-                    if (defect === 'Other Defects' && pair.otherDefects && pair.otherDefects.length > 0) {
-                        defectCounts[defect] += pair.otherDefects.length; // UBAH DARI ++ MENJADI += length
-                    } else if (defect !== 'Other Defects') {
-                        defectCounts[defect]++;
-                    }
+        } else if (target.classList.contains('delete-btn')) {
+            showModal({
+                title: 'Konfirmasi Hapus File',
+                body: `<p>Apakah Anda yakin ingin menghapus file ini secara permanen?</p>`,
+                confirmText: 'Ya, Hapus',
+                onConfirm: async () => {
+                    await deleteFromDB(fileId);
+                    const existingData = await getFromDB();
+                    await renderSavedFilesOptimized(existingData, null);
+                    hideModal();
                 }
             });
         }
-    });
+    }
 
-    const totalDefects = Object.values(defectCounts).reduce((a, b) => a + b, 0);
+    async function handleDownload(fileData) {
+        showLoadingOverlay();
 
-    const headers = [
-        'Date',
-        'Style Number',
-        'Model',
-'Component alignment (visible or expose component)',
-'Component alignment right versus left ',
-'Cutting/trimming (rubber flash, over triming, component edge; hairy & fraying)',
-'Lacing - Finished shoe lacing ',
-'Midsole shape - less definition, deform and midsole texture',
-'Over cement on Finish shoes',
-'Over cement on Bottom unit',
-'Perforation, laser, or 2nd cutting consistency',
-'Staining/Contamination',
-'Stitching margins and SPI',
-'Thread End',
-'Toe spring',
-'Toe stuffing (shape and placement inside the shoe)',
-'Tongue shape',
-'Wrapping paper',
-'Wrinkling midsole ',
-'Wrinkling Upper',
-'X-Ray',
-'Sockliner Placement - missed position on finished shoes',
-'Painting Quality ',
-'Binding or Folding Quality and consistency',
-'Stockfit part Quality (Placement and fitting)',
-'Airbag Contamination (PU, Painting and cement)',
-'Rat hole',
-'Color migration and color mismatch',
-'Heel, Collar and Toe shape',
-'Hot Knife- Incomplete Hot Knife cutting ',
-'Inner box condition (crushed, wrinkled, color variation, etc.)',
-'Lace loop/pull tab attachment - Broken lace loop/pull tab',
-'Midsole Color/Burning',
-'Midsole - under/over side wall buffing',
-'Emblishment; Quality and molded component definition ',
-'Outsole colors (dam spillover) - Color Bleeding',
-'Over buffing',
-'Rocking (>2mm)',
-'Off center ',
-'UPC label damaged',
-'Yellowing on sole unit',
-'Yellowing on upper',
-'Rubber outsole quality (under cure, double skin, concave)  ',
-'Bond Gap and Delamination',
-'Broken Lace ',
-'Twisted and Inverted stance (banana shoe)',
-'Material tearing/damage',
-'Metal contamination',
-'Moldy',
-'No-sew Quality',
-'Plate/shank damage',
-'Size mis-match/ Wrong size/Wrong C/O label/Missing UPC label',
-'Stitching (missing or gaps) - Broken / loose stitched ',
-        'Other Defects',
-        'Total Defect'
-    ];
+        try {
+            const zip = new JSZip();
+            const imgFolder = zip.folder("images");
 
-    const dataRow = [
-        fileData.header.date,
-        fileData.header.styleNumber,
-        fileData.header.model,
-defectCounts['Component alignment (visible or expose component)'],
-defectCounts['Component alignment right versus left '],
-defectCounts['Cutting/trimming (rubber flash, over triming, component edge; hairy & fraying)'],
-defectCounts['Lacing - Finished shoe lacing '],
-defectCounts['Midsole shape - less definition, deform and midsole texture'],
-defectCounts['Over cement on Finish shoes'],
-defectCounts['Over cement on Bottom unit'],
-defectCounts['Perforation, laser, or 2nd cutting consistency'],
-defectCounts['Staining/Contamination'],
-defectCounts['Stitching margins and SPI'],
-defectCounts['Thread End'],
-defectCounts['Toe spring'],
-defectCounts['Toe stuffing (shape and placement inside the shoe)'],
-defectCounts['Tongue shape'],
-defectCounts['Wrapping paper'],
-defectCounts['Wrinkling midsole '],
-defectCounts['Wrinkling Upper'],
-defectCounts['X-Ray'],
-defectCounts['Sockliner Placement - missed position on finished shoes'],
-defectCounts['Painting Quality '],
-defectCounts['Binding or Folding Quality and consistency'],
-defectCounts['Stockfit part Quality (Placement and fitting)'],
-defectCounts['Airbag Contamination (PU, Painting and cement)'],
-defectCounts['Rat hole'],
-defectCounts['Color migration and color mismatch'],
-defectCounts['Heel, Collar and Toe shape'],
-defectCounts['Hot Knife- Incomplete Hot Knife cutting '],
-defectCounts['Inner box condition (crushed, wrinkled, color variation, etc.)'],
-defectCounts['Lace loop/pull tab attachment - Broken lace loop/pull tab'],
-defectCounts['Midsole Color/Burning'],
-defectCounts['Midsole - under/over side wall buffing'],
-defectCounts['Emblishment; Quality and molded component definition '],
-defectCounts['Outsole colors (dam spillover) - Color Bleeding'],
-defectCounts['Over buffing'],
-defectCounts['Rocking (>2mm)'],
-defectCounts['Off center '],
-defectCounts['UPC label damaged'],
-defectCounts['Yellowing on sole unit'],
-defectCounts['Yellowing on upper'],
-defectCounts['Rubber outsole quality (under cure, double skin, concave)  '],
-defectCounts['Bond Gap and Delamination'],
-defectCounts['Broken Lace '],
-defectCounts['Twisted and Inverted stance (banana shoe)'],
-defectCounts['Material tearing/damage'],
-defectCounts['Metal contamination'],
-defectCounts['Moldy'],
-defectCounts['No-sew Quality'],
-defectCounts['Plate/shank damage'],
-defectCounts['Size mis-match/ Wrong size/Wrong C/O label/Missing UPC label'],
-defectCounts['Stitching (missing or gaps) - Broken / loose stitched '],
-        defectCounts['Other Defects'],
-        totalDefects
-    ];
+            const excelHeaders = ['Date', 'Auditor', 'Validation Category', 'Style Number', 'Model', 'Line', 'Pair Number', 'OK/NG', 'Photos Attached', 'Defect type 1', 'Defect type 2', 'Defect type 3', 'Defect type 4', 'Defect type 5', 'Defect type 6', 'Defect type 7', 'Defect type 8', 'Defect type 9', 'Defect type 10'];
+            const dataForSheet = [excelHeaders];
 
-    return [headers, dataRow];
-}
+            const photoPromises = [];
+            fileData.pairs.forEach(pair => {
+                const photoNames = [];
+                if (pair.photos && pair.photos.length > 0) {
+                    pair.photos.forEach((photo, index) => {
+                        const photoName = `Pair-${pair.pairNumber}-Foto-${index + 1}.jpg`;
+                        photoNames.push(photoName);
+                        photoPromises.push({
+                            name: photoName,
+                            data: photo.data.startsWith('data:image') ? photo.data.split(',')[1] : photo.data
+                        });
+                    });
+                }
 
-/**
- * Generate Other Defects Sheet Data
- */
-function generateOtherDefectsSheet(fileData) {
-    const headers = ['Pair Number', 'Defect detail for other'];
-    const rows = [headers];
+                const allDefects = [];
+                
+                if (pair.defects && pair.defects.length > 0) {
+                    pair.defects.forEach(defect => {
+                        if (defect !== 'Other Defects') {
+                            allDefects.push(defect);
+                        }
+                    });
+                }
+                
+                if (pair.otherDefects && pair.otherDefects.length > 0) {
+                    pair.otherDefects.forEach(() => {
+                        allDefects.push('Other Defects');
+                    });
+                }
 
-    fileData.pairs.forEach(pair => {
-        // Cek apakah pair ini memiliki Other Defects
-        if (pair.otherDefects && pair.otherDefects.length > 0) {
-            pair.otherDefects.forEach(detail => {
-                rows.push([pair.pairNumber, detail]);
+                const row = [
+                    fileData.header.date,
+                    fileData.header.auditor,
+                    fileData.header.validationCategory,
+                    fileData.header.styleNumber,
+                    fileData.header.model,
+                    fileData.header.line,
+                    pair.pairNumber,
+                    pair.status,
+                    photoNames.join(', '),
+                    ...Array(10).fill('').map((_, i) => allDefects[i] || '')
+                ];
+
+                dataForSheet.push(row);
             });
+
+            for (const { name, data } of photoPromises) {
+                imgFolder.file(name, data, { base64: true });
+            }
+
+            const ws1 = XLSX.utils.aoa_to_sheet(dataForSheet);
+            const summaryData = generateSummaryData(fileData);
+            const ws2 = XLSX.utils.aoa_to_sheet(summaryData);
+            const otherDefectsData = generateOtherDefectsSheet(fileData);
+            const ws3 = XLSX.utils.aoa_to_sheet(otherDefectsData);
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws1, 'LWT Report');
+            XLSX.utils.book_append_sheet(wb, ws2, 'Summary');
+            XLSX.utils.book_append_sheet(wb, ws3, 'Other Defects');
+
+            const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            zip.file(`${fileData.name}.xlsx`, excelBuffer);
+
+            const content = await zip.generateAsync({
+                type: "blob",
+                compression: "DEFLATE",
+                compressionOptions: { level: 6 }
+            });
+
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(content);
+            link.download = `${fileData.name}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (error) {
+            console.error('Gagal membuat file download:', error);
+            alert(`Gagal membuat file download: ${error.message}`);
+        } finally {
+            hideLoadingOverlay();
         }
-    });
-
-    // Jika tidak ada Other Defects, kembalikan sheet kosong dengan header saja
-    if (rows.length === 1) {
-        rows.push(['', 'No Other Defects recorded']);
     }
 
-    return rows;
-}
+    function generateSummaryData(fileData) {
+        const defectList = [
+            'Component alignment (visible or expose component)',
+            'Component alignment right versus left ',
+            'Cutting/trimming (rubber flash, over triming, component edge; hairy & fraying)',
+            'Lacing - Finished shoe lacing ',
+            'Midsole shape - less definition, deform and midsole texture',
+            'Over cement on Finish shoes',
+            'Over cement on Bottom unit',
+            'Perforation, laser, or 2nd cutting consistency',
+            'Staining/Contamination',
+            'Stitching margins and SPI',
+            'Thread End',
+            'Toe spring',
+            'Toe stuffing (shape and placement inside the shoe)',
+            'Tongue shape',
+            'Wrapping paper',
+            'Wrinkling midsole ',
+            'Wrinkling Upper',
+            'X-Ray',
+            'Sockliner Placement - missed position on finished shoes',
+            'Painting Quality ',
+            'Binding or Folding Quality and consistency',
+            'Stockfit part Quality (Placement and fitting)',
+            'Airbag Contamination (PU, Painting and cement)',
+            'Rat hole',
+            'Color migration and color mismatch',
+            'Heel, Collar and Toe shape',
+            'Hot Knife- Incomplete Hot Knife cutting ',
+            'Inner box condition (crushed, wrinkled, color variation, etc.)',
+            'Lace loop/pull tab attachment - Broken lace loop/pull tab',
+            'Midsole Color/Burning',
+            'Midsole - under/over side wall buffing',
+            'Emblishment; Quality and molded component definition ',
+            'Outsole colors (dam spillover) - Color Bleeding',
+            'Over buffing',
+            'Rocking (>2mm)',
+            'Off center ',
+            'UPC label damaged',
+            'Yellowing on sole unit',
+            'Yellowing on upper',
+            'Rubber outsole quality (under cure, double skin, concave)  ',
+            'Bond Gap and Delamination',
+            'Broken Lace ',
+            'Twisted and Inverted stance (banana shoe)',
+            'Material tearing/damage',
+            'Metal contamination',
+            'Moldy',
+            'No-sew Quality',
+            'Plate/shank damage',
+            'Size mis-match/ Wrong size/Wrong C/O label/Missing UPC label',
+            'Stitching (missing or gaps) - Broken / loose stitched ',
+            'Other Defects'
+        ];
 
-async function renderSavedFilesOptimized(existingData, newFileData) {
-    const listElement = DOMElements.savedFilesList;
+        const defectCounts = {};
+        defectList.forEach(defect => defectCounts[defect] = 0);
 
-    // Tambahkan data baru jika ada
-    let data = existingData;
-    if (newFileData) {
-        data = [...existingData, newFileData];
+        fileData.pairs.forEach(pair => {
+            if (pair.defects && pair.defects.length > 0) {
+                pair.defects.forEach(defect => {
+                    if (defectList.includes(defect)) {
+                        if (defect === 'Other Defects' && pair.otherDefects && pair.otherDefects.length > 0) {
+                            defectCounts[defect] += pair.otherDefects.length;
+                        } else if (defect !== 'Other Defects') {
+                            defectCounts[defect]++;
+                        }
+                    }
+                });
+            }
+        });
+
+        const totalDefects = Object.values(defectCounts).reduce((a, b) => a + b, 0);
+
+        const headers = [
+            'Date',
+            'Style Number',
+            'Model',
+            ...defectList,
+            'Total Defect'
+        ];
+
+        const dataRow = [
+            fileData.header.date,
+            fileData.header.styleNumber,
+            fileData.header.model,
+            ...defectList.map(defect => defectCounts[defect]),
+            totalDefects
+        ];
+
+        return [headers, dataRow];
     }
-    data = data.sort((a, b) => b.id.localeCompare(a.id)); // Urutkan berdasarkan ID (terbaru dulu)
 
-    // Kosongkan listElement sepenuhnya sebelum render
-    listElement.innerHTML = '';
+    function generateOtherDefectsSheet(fileData) {
+        const headers = ['Pair Number', 'Defect detail for other'];
+        const rows = [headers];
 
-    // Jika tidak ada data, tampilkan pesan placeholder
-    if (data.length === 0) {
-        listElement.innerHTML = '<li>Belum ada data yang tersimpan.</li>';
-        return;
+        fileData.pairs.forEach(pair => {
+            if (pair.otherDefects && pair.otherDefects.length > 0) {
+                pair.otherDefects.forEach(detail => {
+                    rows.push([pair.pairNumber, detail]);
+                });
+            }
+        });
+
+        if (rows.length === 1) {
+            rows.push(['', 'No Other Defects recorded']);
+        }
+
+        return rows;
     }
 
-    // Render elemen untuk setiap file
-    data.forEach(file => {
-        const li = document.createElement('li');
-        li.innerHTML = `
-            <span class="file-name">${file.name}</span>
-            <div class="file-actions">
-                <button class="btn btn-primary download-btn" data-id="${file.id}">Download</button>
-                <button class="btn btn-danger delete-btn" data-id="${file.id}">Hapus</button>
-            </div>
-        `;
-        listElement.appendChild(li);
-    });
-}
+    async function renderSavedFilesOptimized(existingData, newFileData) {
+        const listElement = DOMElements.savedFilesList;
+
+        let data = existingData;
+        if (newFileData) {
+            data = [...existingData, newFileData];
+        }
+        data = data.sort((a, b) => b.id.localeCompare(a.id));
+
+        listElement.innerHTML = '';
+
+        if (data.length === 0) {
+            listElement.innerHTML = '<li>Belum ada data yang tersimpan.</li>';
+            return;
+        }
+
+        data.forEach(file => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <span class="file-name">${file.name}</span>
+                <div class="file-actions">
+                    <button class="btn btn-primary download-btn" data-id="${file.id}">Download</button>
+                    <button class="btn btn-danger delete-btn" data-id="${file.id}">Hapus</button>
+                </div>
+            `;
+            listElement.appendChild(li);
+        });
+    }
 
     function getSavedData() {
         return getFromDB();
     }
 
     // =========================================================================
-    // 7. UTILITY MODAL (Konfirmasi)
+    // 8. UTILITY MODAL (Konfirmasi)
     // =========================================================================
     
     function showModal({ title, body, confirmText = 'OK', cancelText = 'Batal', onConfirm, onCancel }) {
@@ -1121,36 +1172,23 @@ async function renderSavedFilesOptimized(existingData, newFileData) {
     }
     
     // =========================================================================
-    // 7.b UTILITY OVERLAY FREEZE (BARU)
+    // 9. UTILITY OVERLAY FREEZE
     // =========================================================================
     
-    /**
-     * Menampilkan loading overlay dan memblokir input user.
-     */
     function showLoadingOverlay() {
-        // Mencegah error jika elemen tidak ditemukan
         if (DOMElements.loadingOverlay) {
             DOMElements.loadingOverlay.style.display = 'flex';
         }
-        if (DOMElements.uploadProgress) {
-            DOMElements.uploadProgress.style.display = 'block';
-            DOMElements.uploadProgress.value = 0;
-        }
     }
 
-    /**
-     * Menyembunyikan loading overlay dan mengaktifkan kembali input user.
-     */
     function hideLoadingOverlay() {
         if (DOMElements.loadingOverlay) {
             DOMElements.loadingOverlay.style.display = 'none';
         }
-        if (DOMElements.uploadProgress) {
-            DOMElements.uploadProgress.style.display = 'none';
-        }
     }
+    
     // =========================================================================
-    // 8. JALANKAN APLIKASI
+    // 10. JALANKAN APLIKASI
     // =========================================================================
     initializeApp();
 });
