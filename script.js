@@ -1,6 +1,6 @@
 /**
  * @file script.js
- * @description Main logic for the Line Walk Through application (V5 - With Auto-Save & Auto-Restore).
+ * @description Main logic for the Line Walk Through application (V6 - Fixed Auto-Save & Auto-Restore).
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,14 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Variabel Global dan Referensi DOM
     // =========================================================================
     const STORAGE_KEY = 'lineWalkThroughData';
-    const DRAFT_KEY = 'lineWalkThroughDraft'; // BARU: Key untuk draft data
+    const DRAFT_KEY = 'lineWalkThroughDraft';
     const TOTAL_PAIRS = 20;
     let currentModalAction = { onConfirm: null, onCancel: null };
+    let saveTimeout = null; // Global timeout untuk debounce
     
  
     // Konstanta untuk batasan upload
     const MAX_PHOTOS_PER_PAIR = 10;
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 5MB
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB (diubah dari 5MB)
     const MAX_WIDTH = 1024;
     const MAX_HEIGHT = 1024;
 
@@ -74,11 +75,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /**
      * Mengompresi gambar menggunakan Canvas API.
-     * @param {string} base64String - Base64 string gambar asli.
-     * @param {number} maxWidth - Lebar maksimal.
-     * @param {number} maxHeight - Tinggi maksimal.
-     * @param {number} quality - Kualitas kompresi (0-1).
-     * @returns {Promise<string>} Base64 string gambar terkompresi.
      */
     function compressImage(base64String, maxWidth = MAX_WIDTH, maxHeight = MAX_HEIGHT, quality = 0.8) {
         return new Promise((resolve, reject) => {
@@ -87,7 +83,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
 
-                // Hitung ukuran baru sambil maintain aspect ratio
                 let { width, height } = img;
                 if (width > height) {
                     if (width > maxWidth) {
@@ -103,11 +98,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 canvas.width = width;
                 canvas.height = height;
-
-                // Draw gambar ke canvas
                 ctx.drawImage(img, 0, 0, width, height);
 
-                // Konversi ke base64 dengan kualitas rendah
                 const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
                 resolve(compressedBase64);
             };
@@ -117,108 +109,158 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const DOMElements = {
-        // Form Elements
         auditor: document.getElementById('auditor'),
         validationCategory: document.getElementById('validation-category'),
         styleNumberInput: document.getElementById('style-number'),
         autocompleteResults: document.getElementById('autocomplete-results'),
         model: document.getElementById('model'),
         line: document.getElementById('line'),
-        
-        // Data Entry/Table
         dataEntryBody: document.getElementById('data-entry-body'),
         saveButton: document.getElementById('save-button'),
-        
-        // Saved Files
         savedFilesList: document.getElementById('saved-files-list'),
-        
-        // Modal
         modal: document.getElementById('app-modal'),
         modalTitle: document.getElementById('modal-title'),
         modalBody: document.getElementById('modal-body'),
         modalConfirmBtn: document.getElementById('modal-confirm-btn'),
         modalCancelBtn: document.getElementById('modal-cancel-btn'),
-    
-       // TAMBAHAN BARU UNTUK OVERLAY
         loadingOverlay: document.getElementById('loading-overlay'),
     };
 
     // =========================================================================
-    // 2. FUNGSI AUTO-SAVE & AUTO-RESTORE (BARU)
+    // 2. FUNGSI AUTO-SAVE & AUTO-RESTORE (DIPERBAIKI)
     // =========================================================================
     
     /**
-     * Menyimpan draft data ke localStorage
+     * Menyimpan draft data ke localStorage dengan error handling
+     * @param {boolean} immediate - Jika true, simpan langsung tanpa debounce
      */
-    function saveDraftToLocalStorage() {
-        try {
-            const draftData = {
-                form: {
-                    auditor: DOMElements.auditor.value,
-                    validationCategory: DOMElements.validationCategory.value,
-                    styleNumber: DOMElements.styleNumberInput.value,
-                    model: DOMElements.model.value,
-                    line: DOMElements.line.value
-                },
-                pairs: []
-            };
-
-            // Ambil data dari setiap row
-            DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
-                const pairData = {
-                    pairNumber: tr.dataset.pairNumber,
-                    status: tr.querySelector('.status-select').value,
-                    defects: tr.dataset.defects || '[]',
-                    otherDefects: tr.dataset.otherDefects || '[]',
-                    photos: tr.dataset.photos || '[]'
+    function saveDraftToLocalStorage(immediate = false) {
+        const actualSave = () => {
+            try {
+                const draftData = {
+                    timestamp: Date.now(), // Tambahkan timestamp untuk tracking
+                    form: {
+                        auditor: DOMElements.auditor.value,
+                        validationCategory: DOMElements.validationCategory.value,
+                        styleNumber: DOMElements.styleNumberInput.value,
+                        model: DOMElements.model.value,
+                        line: DOMElements.line.value
+                    },
+                    pairs: []
                 };
-                draftData.pairs.push(pairData);
-            });
 
-            localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
-            console.log('Draft auto-saved to localStorage');
-        } catch (error) {
-            console.error('Failed to save draft:', error);
+                // Ambil data dari setiap row
+                DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
+                    const pairData = {
+                        pairNumber: tr.dataset.pairNumber,
+                        status: tr.querySelector('.status-select').value,
+                        defects: tr.dataset.defects || '[]',
+                        otherDefects: tr.dataset.otherDefects || '[]',
+                        photos: tr.dataset.photos || '[]'
+                    };
+                    draftData.pairs.push(pairData);
+                });
+
+                // Simpan ke localStorage dengan try-catch
+                const dataString = JSON.stringify(draftData);
+                localStorage.setItem(DRAFT_KEY, dataString);
+                
+                console.log('✓ Draft auto-saved at:', new Date().toLocaleTimeString());
+                
+                // Update visual indicator (optional)
+                updateSaveIndicator(true);
+            } catch (error) {
+                console.error('❌ Failed to save draft:', error);
+                
+                // Coba clear localStorage jika penuh
+                if (error.name === 'QuotaExceededError') {
+                    console.warn('LocalStorage penuh, mencoba membersihkan...');
+                    try {
+                        // Hapus draft lama
+                        localStorage.removeItem(DRAFT_KEY);
+                        // Coba save lagi
+                        localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+                        console.log('✓ Draft saved after cleanup');
+                    } catch (retryError) {
+                        console.error('❌ Gagal save setelah cleanup:', retryError);
+                        alert('Peringatan: Data tidak dapat disimpan sementara. Segera simpan data Anda!');
+                    }
+                }
+                
+                updateSaveIndicator(false);
+            }
+        };
+
+        // Jika immediate, langsung save tanpa debounce
+        if (immediate) {
+            if (saveTimeout) clearTimeout(saveTimeout);
+            actualSave();
+        } else {
+            // Gunakan debounce untuk performa
+            if (saveTimeout) clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(actualSave, 150); // Dikurangi dari 500ms ke 150ms
         }
     }
 
     /**
-     * Memulihkan draft data dari localStorage
+     * Update visual indicator untuk status save (optional)
+     */
+    function updateSaveIndicator(success) {
+        // Bisa ditambahkan indikator visual di UI jika diperlukan
+        // Misalnya: dot hijau = saved, dot merah = error
+    }
+
+    /**
+     * Memulihkan draft data dari localStorage (DIPERBAIKI)
      */
     function restoreDraftFromLocalStorage() {
         try {
             const savedDraft = localStorage.getItem(DRAFT_KEY);
             if (!savedDraft) {
-                console.log('No draft found in localStorage');
-                return;
+                console.log('ℹ No draft found');
+                return false;
             }
 
             const draftData = JSON.parse(savedDraft);
-
-            // Restore form data
-            if (draftData.form) {
-                DOMElements.auditor.value = draftData.form.auditor || '';
-                DOMElements.validationCategory.value = draftData.form.validationCategory || '';
-                DOMElements.styleNumberInput.value = draftData.form.styleNumber || '';
-                DOMElements.model.value = draftData.form.model || '';
-                DOMElements.line.value = draftData.form.line || '';
+            
+            // Validasi data
+            if (!draftData || !draftData.form || !draftData.pairs) {
+                console.warn('⚠ Invalid draft data structure');
+                return false;
             }
 
-            // Restore pairs data
-            if (draftData.pairs && draftData.pairs.length > 0) {
-                draftData.pairs.forEach(pairData => {
-                    const tr = DOMElements.dataEntryBody.querySelector(`tr[data-pair-number="${pairData.pairNumber}"]`);
-                    if (!tr) return;
+            console.log('📦 Restoring draft from:', new Date(draftData.timestamp).toLocaleString());
 
+            // Restore form data
+            DOMElements.auditor.value = draftData.form.auditor || '';
+            DOMElements.validationCategory.value = draftData.form.validationCategory || '';
+            DOMElements.styleNumberInput.value = draftData.form.styleNumber || '';
+            DOMElements.model.value = draftData.form.model || '';
+            DOMElements.line.value = draftData.form.line || '';
+
+            // Restore pairs data
+            let restoredCount = 0;
+            draftData.pairs.forEach(pairData => {
+                const tr = DOMElements.dataEntryBody.querySelector(`tr[data-pair-number="${pairData.pairNumber}"]`);
+                if (!tr) {
+                    console.warn(`⚠ Row not found for pair ${pairData.pairNumber}`);
+                    return;
+                }
+
+                try {
                     // Restore status
                     const statusSelect = tr.querySelector('.status-select');
                     statusSelect.value = pairData.status || '';
                     
-                    // Trigger perubahan status untuk update UI
+                    // Update class untuk styling
                     if (statusSelect.value) {
                         statusSelect.classList.add('status-selected');
-                        statusSelect.classList.toggle('status-ok', statusSelect.value === 'OK');
-                        statusSelect.classList.toggle('status-ng', statusSelect.value === 'NG');
+                        statusSelect.classList.remove('status-ok', 'status-ng');
+                        if (statusSelect.value === 'OK') {
+                            statusSelect.classList.add('status-ok');
+                        } else if (statusSelect.value === 'NG') {
+                            statusSelect.classList.add('status-ng');
+                        }
                     }
 
                     // Restore defects
@@ -228,28 +270,51 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Restore photos
                     tr.dataset.photos = pairData.photos;
 
-                    // Update UI untuk defect container
+                    // Update UI untuk defect container dan photo button
                     const defectContainer = tr.querySelector('.defect-input-container');
                     const addPhotoButton = tr.querySelector('.add-photo-btn');
                     
                     if (statusSelect.value === 'NG') {
-                        defectContainer.classList.replace('disabled', 'enabled');
-                        defectContainer.querySelector('.placeholder-text').textContent = 'Klik untuk pilih defect...';
+                        defectContainer.classList.remove('disabled');
+                        defectContainer.classList.add('enabled');
+                        const placeholder = defectContainer.querySelector('.placeholder-text');
+                        if (placeholder) {
+                            placeholder.textContent = 'Klik untuk pilih defect...';
+                        }
                         addPhotoButton.style.display = 'block';
+                    } else {
+                        defectContainer.classList.remove('enabled');
+                        defectContainer.classList.add('disabled');
+                        addPhotoButton.style.display = 'none';
                     }
 
                     // Update tampilan defect tags dan photo gallery
                     updateDefectTags(tr);
                     updatePhotoGallery(tr);
-                });
+                    
+                    if (pairData.status) restoredCount++;
+                } catch (error) {
+                    console.error(`❌ Error restoring pair ${pairData.pairNumber}:`, error);
+                }
+            });
+
+            if (restoredCount > 0) {
+                console.log(`✓ Successfully restored ${restoredCount} pairs`);
+                showDraftRestoredNotification(restoredCount);
+                return true;
             }
 
-            console.log('Draft restored from localStorage');
-            
-            // Tampilkan notifikasi bahwa draft telah dipulihkan
-            showDraftRestoredNotification();
+            return false;
         } catch (error) {
-            console.error('Failed to restore draft:', error);
+            console.error('❌ Critical error restoring draft:', error);
+            
+            // Jika data corrupt, hapus draft
+            if (error instanceof SyntaxError) {
+                console.warn('⚠ Corrupt draft detected, clearing...');
+                localStorage.removeItem(DRAFT_KEY);
+            }
+            
+            return false;
         }
     }
 
@@ -259,53 +324,106 @@ document.addEventListener('DOMContentLoaded', () => {
     function clearDraftFromLocalStorage() {
         try {
             localStorage.removeItem(DRAFT_KEY);
-            console.log('Draft cleared from localStorage');
+            console.log('✓ Draft cleared');
+            updateSaveIndicator(true);
         } catch (error) {
-            console.error('Failed to clear draft:', error);
+            console.error('❌ Failed to clear draft:', error);
         }
     }
 
     /**
      * Menampilkan notifikasi bahwa draft telah dipulihkan
      */
-    function showDraftRestoredNotification() {
+    function showDraftRestoredNotification(count) {
         const notification = document.createElement('div');
         notification.style.cssText = `
             position: fixed;
             top: 20px;
             right: 20px;
-            background-color: #4CAF50;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 15px 20px;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
             z-index: 10000;
             font-size: 14px;
-            animation: slideIn 0.3s ease-out;
+            font-weight: 500;
+            animation: slideInRight 0.4s ease-out;
+            max-width: 300px;
         `;
-        notification.textContent = '✓ Data sebelumnya telah dipulihkan';
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">💾</span>
+                <div>
+                    <div style="font-weight: bold; margin-bottom: 4px;">Data Dipulihkan</div>
+                    <div style="font-size: 12px; opacity: 0.9;">${count} pair telah dikembalikan</div>
+                </div>
+            </div>
+        `;
         document.body.appendChild(notification);
 
+        // Tambahkan animasi CSS jika belum ada
+        if (!document.getElementById('notification-style')) {
+            const style = document.createElement('style');
+            style.id = 'notification-style';
+            style.textContent = `
+                @keyframes slideInRight {
+                    from {
+                        transform: translateX(400px);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+                @keyframes slideOutRight {
+                    from {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                    to {
+                        transform: translateX(400px);
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
         setTimeout(() => {
-            notification.style.animation = 'slideOut 0.3s ease-out';
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
+            notification.style.animation = 'slideOutRight 0.4s ease-out';
+            setTimeout(() => notification.remove(), 400);
+        }, 4000);
     }
 
     // =========================================================================
-    // 3. FUNGSI INISIALISASI APLIKASI
+    // 3. FUNGSI INISIALISASI APLIKASI (DIPERBAIKI)
     // =========================================================================
     
     async function initializeApp() {
+        console.log('🚀 Initializing app...');
+        
+        // Step 1: Populate dropdown
         populateLineDropdown();
+        
+        // Step 2: Generate table rows
         generateDataEntryRows();
         
-        // BARU: Restore draft sebelum setup event listeners
-        restoreDraftFromLocalStorage();
+        // Step 3: PENTING - Tunggu sebentar agar DOM benar-benar siap
+        await new Promise(resolve => setTimeout(resolve, 100));
         
+        // Step 4: Restore draft SETELAH DOM siap
+        const restored = restoreDraftFromLocalStorage();
+        
+        // Step 5: Setup event listeners TERAKHIR
         setupEventListeners();
+        
+        // Step 6: Load saved files
         const existingData = await getFromDB();
         await renderSavedFilesOptimized(existingData, null);
+        
+        console.log('✓ App initialized', restored ? '(with restored data)' : '(no draft)');
     }
 
     function populateLineDropdown() {
@@ -323,6 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.dataset.pairNumber = i;
             tr.dataset.photos = '[]';
             tr.dataset.defects = '[]';
+            tr.dataset.otherDefects = '[]';
             tr.innerHTML = `
                 <td class="col-pair">${i}</td>
                 <td class="col-status">
@@ -344,7 +463,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="photo-gallery"></div>
                         <span class="photo-feedback">Belum ada foto.</span>
                         <button class="add-photo-btn" style="display:none;">+ Tambah Foto</button>
-                        <input type="file" accept="image/*,text/plain" class="hidden-file-input" multiple style="display:none;">
+                        <input type="file" accept="image/*" class="hidden-file-input" multiple style="display:none;">
                     </div>
                 </td>
                 <td class="col-action">
@@ -356,10 +475,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================================
-    // 4. PENGATURAN EVENT LISTENERS
+    // 4. PENGATURAN EVENT LISTENERS (DIPERBAIKI)
     // =========================================================================
     
     function setupEventListeners() {
+        // Autocomplete
         DOMElements.styleNumberInput.addEventListener('input', handleAutocompleteInput);
         DOMElements.autocompleteResults.addEventListener('click', handleAutocompleteSelect);
         document.addEventListener('click', (e) => {
@@ -368,39 +488,41 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
+        // Table events
         DOMElements.dataEntryBody.addEventListener('change', handleTableChange);
         DOMElements.dataEntryBody.addEventListener('click', handleTableClick);
         
+        // Save button
         DOMElements.saveButton.addEventListener('click', handleSaveValidation);
+        
+        // Modal
         DOMElements.modalConfirmBtn.addEventListener('click', () => currentModalAction.onConfirm?.());
         DOMElements.modalCancelBtn.addEventListener('click', () => currentModalAction.onCancel?.());
         
+        // Saved files
         DOMElements.savedFilesList.addEventListener('click', handleSavedFilesActions);
 
-        // BARU: Event listeners untuk auto-save
+        // Auto-save listeners
         setupAutoSaveListeners();
+        
+        console.log('✓ Event listeners attached');
     }
 
     /**
-     * BARU: Setup event listeners untuk auto-save
+     * Setup event listeners untuk auto-save (DIPERBAIKI)
      */
     function setupAutoSaveListeners() {
-        // Auto-save saat form berubah
-        DOMElements.auditor.addEventListener('input', saveDraftToLocalStorage);
-        DOMElements.validationCategory.addEventListener('change', saveDraftToLocalStorage);
-        DOMElements.styleNumberInput.addEventListener('input', saveDraftToLocalStorage);
-        DOMElements.model.addEventListener('input', saveDraftToLocalStorage);
-        DOMElements.line.addEventListener('change', saveDraftToLocalStorage);
+        // Form inputs - save dengan debounce
+        DOMElements.auditor.addEventListener('input', () => saveDraftToLocalStorage(false));
+        DOMElements.validationCategory.addEventListener('change', () => saveDraftToLocalStorage(true)); // Immediate
+        DOMElements.styleNumberInput.addEventListener('input', () => saveDraftToLocalStorage(false));
+        DOMElements.model.addEventListener('input', () => saveDraftToLocalStorage(false));
+        DOMElements.line.addEventListener('change', () => saveDraftToLocalStorage(true)); // Immediate
 
-        // Auto-save saat tabel berubah (dengan debounce)
-        let saveTimeout;
-        const debouncedSave = () => {
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(saveDraftToLocalStorage, 500);
-        };
-
-        DOMElements.dataEntryBody.addEventListener('change', debouncedSave);
-        DOMElements.dataEntryBody.addEventListener('input', debouncedSave);
+        // HAPUS event listener duplikat di table
+        // Sudah ditangani di handleTableChange dan handleTableClick
+        
+        console.log('✓ Auto-save listeners ready');
     }
 
     // =========================================================================
@@ -440,13 +562,13 @@ document.addEventListener('DOMContentLoaded', () => {
             DOMElements.model.value = styleModelMap[selectedStyle] || '';
             DOMElements.autocompleteResults.style.display = 'none';
             
-            // BARU: Auto-save setelah select
-            saveDraftToLocalStorage();
+            // Auto-save immediate
+            saveDraftToLocalStorage(true);
         }
     }
 
     // =========================================================================
-    // 6. HANDLER TABEL (Status, Defect, Foto)
+    // 6. HANDLER TABEL (Status, Defect, Foto) - DIPERBAIKI
     // =========================================================================
 
     function handleTableChange(e) {
@@ -458,23 +580,35 @@ document.addEventListener('DOMContentLoaded', () => {
             const defectContainer = tr.querySelector('.defect-input-container');
             
             target.classList.add('status-selected');
-            target.classList.toggle('status-ok', target.value === 'OK');
-            target.classList.toggle('status-ng', target.value === 'NG');
+            target.classList.remove('status-ok', 'status-ng');
+            if (target.value === 'OK') {
+                target.classList.add('status-ok');
+            } else if (target.value === 'NG') {
+                target.classList.add('status-ng');
+            }
 
             if (target.value === 'NG') {
-                defectContainer.classList.replace('disabled', 'enabled');
-                defectContainer.querySelector('.placeholder-text').textContent = 'Klik untuk pilih defect...';
+                defectContainer.classList.remove('disabled');
+                defectContainer.classList.add('enabled');
+                const placeholder = defectContainer.querySelector('.placeholder-text');
+                if (placeholder) {
+                    placeholder.textContent = 'Klik untuk pilih defect...';
+                }
                 addPhotoButton.style.display = 'block';
             } else {
-                defectContainer.classList.replace('enabled', 'disabled');
-                defectContainer.querySelector('.placeholder-text').textContent = "Pilih 'NG' untuk mengisi";
+                defectContainer.classList.remove('enabled');
+                defectContainer.classList.add('disabled');
+                const placeholder = defectContainer.querySelector('.placeholder-text');
+                if (placeholder) {
+                    placeholder.textContent = "Pilih 'NG' untuk mengisi";
+                }
                 addPhotoButton.style.display = 'none';
                 resetDefectsForRow(tr);
                 resetPhotosForRow(tr);
             }
             
-            // BARU: Auto-save setelah perubahan status
-            saveDraftToLocalStorage();
+            // Auto-save IMMEDIATE karena ini perubahan penting
+            saveDraftToLocalStorage(true);
         }
 
         if (target.classList.contains('hidden-file-input')) {
@@ -502,7 +636,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 title: 'Konfirmasi Hapus',
                 body: `<p>Hapus data inspeksi <strong>Pair #${tr.dataset.pairNumber}</strong>?</p>`,
                 confirmText: 'Ya, Hapus',
-                onConfirm: () => { resetRow(tr); hideModal(); saveDraftToLocalStorage(); } // BARU: Auto-save setelah hapus
+                onConfirm: () => { 
+                    resetRow(tr); 
+                    hideModal(); 
+                    saveDraftToLocalStorage(true); // Immediate save
+                }
             });
         } 
         else if (target.closest('.defect-input-container.enabled')) {
@@ -515,27 +653,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!files.length) return;
         const tr = e.target.closest('tr');
 
-        // Periksa batas foto di awal
         let currentPhotos = JSON.parse(tr.dataset.photos || '[]');
         if (currentPhotos.length >= MAX_PHOTOS_PER_PAIR) {
             alert(`Jumlah ${MAX_PHOTOS_PER_PAIR} limit foto sudah terpenuhi. Hapus salah satu foto jika Anda ingin mengunggah foto lain.`);
-            e.target.value = ''; // Reset input file
+            e.target.value = '';
             return;
         }
 
-        // Hitung berapa slot yang tersedia
         const availableSlots = MAX_PHOTOS_PER_PAIR - currentPhotos.length;
         const filesToProcess = Array.from(files).slice(0, availableSlots);
 
         if (filesToProcess.length < files.length) {
-            alert(`Hanya ${filesToProcess.length} foto yang dapat diunggah karena batas maksimum adalah ${MAX_PHOTOS_PER_PAIR} foto per pair. Hapus foto yang ada untuk mengunggah lebih banyak.`);
+            alert(`Hanya ${filesToProcess.length} foto yang dapat diunggah karena batas maksimum adalah ${MAX_PHOTOS_PER_PAIR} foto per pair.`);
         }
 
-        // Proses file yang diizinkan
         const processPromises = filesToProcess.map(async (file) => {
-            // Validasi tipe file
             if (!file.type.startsWith('image/')) {
-                alert(`File ${file.name} bukan gambar. Hanya file gambar yang diperbolehkan.`);
+                alert(`File ${file.name} bukan gambar.`);
                 return null;
             }
 
@@ -544,21 +678,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 reader.onload = async (event) => {
                     let base64String = event.target.result;
 
-                    // Jika ukuran file asli > MAX_FILE_SIZE, coba kompresi
                     if (file.size > MAX_FILE_SIZE) {
                         try {
                             console.log(`Mengompresi ${file.name}...`);
                             base64String = await compressImage(base64String);
-                            // Periksa ukuran setelah kompresi (estimasi)
-                            const compressedSize = (base64String.length * 3) / 4; // Approx size
+                            const compressedSize = (base64String.length * 3) / 4;
                             if (compressedSize > MAX_FILE_SIZE) {
-                                alert(`File ${file.name} masih terlalu besar setelah kompresi. Maksimal 5MB.`);
+                                alert(`File ${file.name} masih terlalu besar setelah kompresi.`);
                                 resolve(null);
                                 return;
                             }
-                            alert(`File ${file.name} berhasil dikompresi.`);
+                            console.log(`✓ ${file.name} berhasil dikompresi`);
                         } catch (error) {
-                            alert(`Gagal mengompresi ${file.name}. ${error.message}`);
+                            alert(`Gagal mengompresi ${file.name}.`);
                             resolve(null);
                             return;
                         }
@@ -567,14 +699,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     resolve({ name: file.name, data: base64String });
                 };
                 reader.onerror = () => {
-                    alert(`Gagal membaca file ${file.name}. Pastikan file adalah gambar valid dan tidak rusak.`);
+                    alert(`Gagal membaca file ${file.name}.`);
                     resolve(null);
                 };
                 reader.readAsDataURL(file);
             });
         });
 
-        // Tunggu semua file selesai diproses
         Promise.all(processPromises).then((results) => {
             let photos = JSON.parse(tr.dataset.photos || '[]');
             results.forEach(result => {
@@ -585,8 +716,8 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.dataset.photos = JSON.stringify(photos);
             updatePhotoGallery(tr);
             
-            // BARU: Auto-save setelah upload foto
-            saveDraftToLocalStorage();
+            // Auto-save IMMEDIATE setelah upload foto
+            saveDraftToLocalStorage(true);
         });
 
         e.target.value = '';
@@ -615,8 +746,8 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.dataset.photos = JSON.stringify(photos);
         updatePhotoGallery(tr);
         
-        // BARU: Auto-save setelah hapus foto
-        saveDraftToLocalStorage();
+        // Auto-save immediate
+        saveDraftToLocalStorage(true);
     }
     
     function resetRow(tr) {
@@ -624,7 +755,10 @@ document.addEventListener('DOMContentLoaded', () => {
         statusSelect.value = "";
         statusSelect.className = 'status-select';
         
-        tr.querySelector('.defect-input-container').classList.replace('enabled', 'disabled');
+        const defectContainer = tr.querySelector('.defect-input-container');
+        defectContainer.classList.remove('enabled');
+        defectContainer.classList.add('disabled');
+        
         tr.querySelector('.add-photo-btn').style.display = 'none';
 
         resetDefectsForRow(tr);
@@ -699,8 +833,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateDefectTags(tr);
                 hideModal();
                 
-                // BARU: Auto-save setelah pilih defect
-                saveDraftToLocalStorage();
+                // Auto-save IMMEDIATE setelah pilih defect
+                saveDraftToLocalStorage(true);
             },
         });
         
@@ -752,7 +886,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             const placeholder = document.createElement('span');
             placeholder.className = 'placeholder-text';
-            placeholder.textContent = tr.querySelector('.status-select').value === 'NG' ? 'Klik untuk pilih defect...' : "Pilih 'NG' untuk mengisi";
+            const status = tr.querySelector('.status-select').value;
+            placeholder.textContent = status === 'NG' ? 'Klik untuk pilih defect...' : "Pilih 'NG' untuk mengisi";
             wrapper.appendChild(placeholder);
         }
     }
@@ -852,16 +987,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 transaction.onerror = () => reject(transaction.error);
             });
 
+            console.log('✓ Data saved to IndexedDB');
             alert('Data berhasil disimpan!');
 
             resetFullForm();
             
-            // BARU: Hapus draft setelah data berhasil disimpan
+            // PENTING: Hapus draft SETELAH berhasil save
             clearDraftFromLocalStorage();
 
             await renderSavedFilesOptimized(existingData, fileData);
         } catch (error) {
-            console.error('Gagal menyimpan data:', error);
+            console.error('❌ Gagal menyimpan data:', error);
             alert(`Gagal menyimpan data: ${error.message}`);
         } finally {
             hideLoadingOverlay();
@@ -996,6 +1132,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            
+            console.log('✓ Download complete');
         } catch (error) {
             console.error('Gagal membuat file download:', error);
             alert(`Gagal membuat file download: ${error.message}`);
@@ -1145,12 +1283,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function getSavedData() {
-        return getFromDB();
-    }
-
     // =========================================================================
-    // 8. UTILITY MODAL (Konfirmasi)
+    // 8. UTILITY MODAL
     // =========================================================================
     
     function showModal({ title, body, confirmText = 'OK', cancelText = 'Batal', onConfirm, onCancel }) {
@@ -1172,7 +1306,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // =========================================================================
-    // 9. UTILITY OVERLAY FREEZE
+    // 9. UTILITY OVERLAY
     // =========================================================================
     
     function showLoadingOverlay() {
