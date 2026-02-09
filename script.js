@@ -1,6 +1,6 @@
 /**
  * @file script.js
- * @description Main logic for the Line Walk Through application (V6 - Fixed Auto-Save & Auto-Restore).
+ * @description Main logic for the Line Walk Through application (V7 - Photos in IndexedDB).
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -10,20 +10,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // =========================================================================
     const STORAGE_KEY = 'lineWalkThroughData';
     const DRAFT_KEY = 'lineWalkThroughDraft';
+    const DRAFT_PHOTOS_STORE = 'draftPhotos'; // BARU: Store untuk foto draft
     const TOTAL_PAIRS = 20;
     let currentModalAction = { onConfirm: null, onCancel: null };
-    let saveTimeout = null; // Global timeout untuk debounce
+    let saveTimeout = null;
     
- 
-    // Konstanta untuk batasan upload
     const MAX_PHOTOS_PER_PAIR = 10;
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB (diubah dari 5MB)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
     const MAX_WIDTH = 1024;
     const MAX_HEIGHT = 1024;
 
     // IndexedDB setup
     const DB_NAME = 'LWT_DB';
-    const DB_VERSION = 1;
+    const DB_VERSION = 2; // NAIK versi karena tambah store baru
     const STORE_NAME = 'inspections';
 
     function openDB() {
@@ -31,8 +30,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const request = indexedDB.open(DB_NAME, DB_VERSION);
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
+                
+                // Store untuk data final
                 if (!db.objectStoreNames.contains(STORE_NAME)) {
                     db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+                }
+                
+                // BARU: Store untuk foto draft
+                if (!db.objectStoreNames.contains(DRAFT_PHOTOS_STORE)) {
+                    db.createObjectStore(DRAFT_PHOTOS_STORE, { keyPath: 'pairNumber' });
                 }
             };
             request.onsuccess = () => resolve(request.result);
@@ -73,9 +79,75 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // =========================================================================
+    // BARU: FUNGSI UNTUK SIMPAN/AMBIL FOTO DRAFT KE INDEXEDDB
+    // =========================================================================
+    
     /**
-     * Mengompresi gambar menggunakan Canvas API.
+     * Simpan foto untuk 1 pair ke IndexedDB
      */
+    async function saveDraftPhotos(pairNumber, photos) {
+        try {
+            const db = await openDB();
+            const transaction = db.transaction([DRAFT_PHOTOS_STORE], 'readwrite');
+            const store = transaction.objectStore(DRAFT_PHOTOS_STORE);
+            
+            store.put({ pairNumber: parseInt(pairNumber), photos: photos });
+            
+            return new Promise((resolve, reject) => {
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = () => reject(transaction.error);
+            });
+        } catch (error) {
+            console.error(`Error saving draft photos for pair ${pairNumber}:`, error);
+        }
+    }
+
+    /**
+     * Ambil foto untuk 1 pair dari IndexedDB
+     */
+    async function getDraftPhotos(pairNumber) {
+        try {
+            const db = await openDB();
+            const transaction = db.transaction([DRAFT_PHOTOS_STORE], 'readonly');
+            const store = transaction.objectStore(DRAFT_PHOTOS_STORE);
+            const request = store.get(parseInt(pairNumber));
+            
+            return new Promise((resolve, reject) => {
+                request.onsuccess = () => {
+                    const result = request.result;
+                    resolve(result ? result.photos : []);
+                };
+                request.onerror = () => reject(request.error);
+            });
+        } catch (error) {
+            console.error(`Error getting draft photos for pair ${pairNumber}:`, error);
+            return [];
+        }
+    }
+
+    /**
+     * Hapus semua foto draft dari IndexedDB
+     */
+    async function clearAllDraftPhotos() {
+        try {
+            const db = await openDB();
+            const transaction = db.transaction([DRAFT_PHOTOS_STORE], 'readwrite');
+            const store = transaction.objectStore(DRAFT_PHOTOS_STORE);
+            store.clear();
+            
+            return new Promise((resolve, reject) => {
+                transaction.oncomplete = () => {
+                    console.log('✓ All draft photos cleared');
+                    resolve();
+                };
+                transaction.onerror = () => reject(transaction.error);
+            });
+        } catch (error) {
+            console.error('Error clearing draft photos:', error);
+        }
+    }
+
     function compressImage(base64String, maxWidth = MAX_WIDTH, maxHeight = MAX_HEIGHT, quality = 0.8) {
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -127,18 +199,18 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // =========================================================================
-    // 2. FUNGSI AUTO-SAVE & AUTO-RESTORE (DIPERBAIKI)
+    // 2. FUNGSI AUTO-SAVE & AUTO-RESTORE (DIPERBAIKI - FOTO KE INDEXEDDB)
     // =========================================================================
     
     /**
-     * Menyimpan draft data ke localStorage dengan error handling
-     * @param {boolean} immediate - Jika true, simpan langsung tanpa debounce
+     * Menyimpan draft data ke localStorage (tanpa foto)
+     * Foto disimpan terpisah ke IndexedDB
      */
     function saveDraftToLocalStorage(immediate = false) {
-        const actualSave = () => {
+        const actualSave = async () => {
             try {
                 const draftData = {
-                    timestamp: Date.now(), // Tambahkan timestamp untuk tracking
+                    timestamp: Date.now(),
                     form: {
                         auditor: DOMElements.auditor.value,
                         validationCategory: DOMElements.validationCategory.value,
@@ -149,71 +221,57 @@ document.addEventListener('DOMContentLoaded', () => {
                     pairs: []
                 };
 
-                // Ambil data dari setiap row
+                // Simpan metadata (tanpa foto) ke localStorage
+                // Foto disimpan ke IndexedDB secara terpisah
+                const photoSavePromises = [];
+                
                 DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
+                    const photos = JSON.parse(tr.dataset.photos || '[]');
+                    
                     const pairData = {
                         pairNumber: tr.dataset.pairNumber,
                         status: tr.querySelector('.status-select').value,
                         defects: tr.dataset.defects || '[]',
                         otherDefects: tr.dataset.otherDefects || '[]',
-                        photos: tr.dataset.photos || '[]'
+                        photoCount: photos.length // Hanya simpan jumlah foto
                     };
                     draftData.pairs.push(pairData);
+                    
+                    // BARU: Simpan foto ke IndexedDB
+                    if (photos.length > 0) {
+                        photoSavePromises.push(
+                            saveDraftPhotos(tr.dataset.pairNumber, photos)
+                        );
+                    }
                 });
 
-                // Simpan ke localStorage dengan try-catch
+                // Tunggu semua foto tersimpan
+                await Promise.all(photoSavePromises);
+
+                // Simpan metadata ke localStorage
                 const dataString = JSON.stringify(draftData);
                 localStorage.setItem(DRAFT_KEY, dataString);
                 
                 console.log('✓ Draft auto-saved at:', new Date().toLocaleTimeString());
                 
-                // Update visual indicator (optional)
-                updateSaveIndicator(true);
             } catch (error) {
                 console.error('❌ Failed to save draft:', error);
-                
-                // Coba clear localStorage jika penuh
-                if (error.name === 'QuotaExceededError') {
-                    console.warn('LocalStorage penuh, mencoba membersihkan...');
-                    try {
-                        // Hapus draft lama
-                        localStorage.removeItem(DRAFT_KEY);
-                        // Coba save lagi
-                        localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
-                        console.log('✓ Draft saved after cleanup');
-                    } catch (retryError) {
-                        console.error('❌ Gagal save setelah cleanup:', retryError);
-                        alert('Peringatan: Data tidak dapat disimpan sementara. Segera simpan data Anda!');
-                    }
-                }
-                
-                updateSaveIndicator(false);
             }
         };
 
-        // Jika immediate, langsung save tanpa debounce
         if (immediate) {
             if (saveTimeout) clearTimeout(saveTimeout);
             actualSave();
         } else {
-            // Gunakan debounce untuk performa
             if (saveTimeout) clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(actualSave, 150); // Dikurangi dari 500ms ke 150ms
+            saveTimeout = setTimeout(actualSave, 150);
         }
     }
 
     /**
-     * Update visual indicator untuk status save (optional)
+     * Memulihkan draft data dari localStorage dan foto dari IndexedDB
      */
-    function updateSaveIndicator(success) {
-        // Bisa ditambahkan indikator visual di UI jika diperlukan
-        // Misalnya: dot hijau = saved, dot merah = error
-    }
-
-    /**
-     * Memulihkan draft data dari localStorage (DIPERBAIKI)
-     */
-    function restoreDraftFromLocalStorage() {
+    async function restoreDraftFromLocalStorage() {
         try {
             const savedDraft = localStorage.getItem(DRAFT_KEY);
             if (!savedDraft) {
@@ -223,7 +281,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const draftData = JSON.parse(savedDraft);
             
-            // Validasi data
             if (!draftData || !draftData.form || !draftData.pairs) {
                 console.warn('⚠ Invalid draft data structure');
                 return false;
@@ -240,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Restore pairs data
             let restoredCount = 0;
-            draftData.pairs.forEach(pairData => {
+            const restorePromises = draftData.pairs.map(async (pairData) => {
                 const tr = DOMElements.dataEntryBody.querySelector(`tr[data-pair-number="${pairData.pairNumber}"]`);
                 if (!tr) {
                     console.warn(`⚠ Row not found for pair ${pairData.pairNumber}`);
@@ -252,7 +309,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const statusSelect = tr.querySelector('.status-select');
                     statusSelect.value = pairData.status || '';
                     
-                    // Update class untuk styling
                     if (statusSelect.value) {
                         statusSelect.classList.add('status-selected');
                         statusSelect.classList.remove('status-ok', 'status-ng');
@@ -267,10 +323,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     tr.dataset.defects = pairData.defects;
                     tr.dataset.otherDefects = pairData.otherDefects;
 
-                    // Restore photos
-                    tr.dataset.photos = pairData.photos;
+                    // BARU: Restore photos dari IndexedDB
+                    const photos = await getDraftPhotos(pairData.pairNumber);
+                    tr.dataset.photos = JSON.stringify(photos);
 
-                    // Update UI untuk defect container dan photo button
+                    // Update UI
                     const defectContainer = tr.querySelector('.defect-input-container');
                     const addPhotoButton = tr.querySelector('.add-photo-btn');
                     
@@ -288,9 +345,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         addPhotoButton.style.display = 'none';
                     }
 
-                    // Update tampilan defect tags dan photo gallery
                     updateDefectTags(tr);
-                    updatePhotoGallery(tr);
+                    updatePhotoGallery(tr); // FOTO AKAN MUNCUL KEMBALI!
                     
                     if (pairData.status) restoredCount++;
                 } catch (error) {
@@ -298,8 +354,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
 
+            // Tunggu semua restore selesai
+            await Promise.all(restorePromises);
+
             if (restoredCount > 0) {
-                console.log(`✓ Successfully restored ${restoredCount} pairs`);
+                console.log(`✓ Successfully restored ${restoredCount} pairs (dengan foto!)`);
                 showDraftRestoredNotification(restoredCount);
                 return true;
             }
@@ -308,7 +367,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('❌ Critical error restoring draft:', error);
             
-            // Jika data corrupt, hapus draft
             if (error instanceof SyntaxError) {
                 console.warn('⚠ Corrupt draft detected, clearing...');
                 localStorage.removeItem(DRAFT_KEY);
@@ -319,21 +377,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Menghapus draft dari localStorage
+     * Menghapus draft dari localStorage DAN foto dari IndexedDB
      */
-    function clearDraftFromLocalStorage() {
+    async function clearDraftFromLocalStorage() {
         try {
             localStorage.removeItem(DRAFT_KEY);
-            console.log('✓ Draft cleared');
-            updateSaveIndicator(true);
+            await clearAllDraftPhotos(); // Hapus foto juga
+            console.log('✓ Draft cleared (metadata + photos)');
         } catch (error) {
             console.error('❌ Failed to clear draft:', error);
         }
     }
 
-    /**
-     * Menampilkan notifikasi bahwa draft telah dipulihkan
-     */
     function showDraftRestoredNotification(count) {
         const notification = document.createElement('div');
         notification.style.cssText = `
@@ -356,36 +411,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span style="font-size: 20px;">💾</span>
                 <div>
                     <div style="font-weight: bold; margin-bottom: 4px;">Data Dipulihkan</div>
-                    <div style="font-size: 12px; opacity: 0.9;">${count} pair telah dikembalikan</div>
+                    <div style="font-size: 12px; opacity: 0.9;">${count} pair + foto dikembalikan ✓</div>
                 </div>
             </div>
         `;
         document.body.appendChild(notification);
 
-        // Tambahkan animasi CSS jika belum ada
         if (!document.getElementById('notification-style')) {
             const style = document.createElement('style');
             style.id = 'notification-style';
             style.textContent = `
                 @keyframes slideInRight {
-                    from {
-                        transform: translateX(400px);
-                        opacity: 0;
-                    }
-                    to {
-                        transform: translateX(0);
-                        opacity: 1;
-                    }
+                    from { transform: translateX(400px); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
                 }
                 @keyframes slideOutRight {
-                    from {
-                        transform: translateX(0);
-                        opacity: 1;
-                    }
-                    to {
-                        transform: translateX(400px);
-                        opacity: 0;
-                    }
+                    from { transform: translateX(0); opacity: 1; }
+                    to { transform: translateX(400px); opacity: 0; }
                 }
             `;
             document.head.appendChild(style);
@@ -398,32 +440,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================================
-    // 3. FUNGSI INISIALISASI APLIKASI (DIPERBAIKI)
+    // 3. FUNGSI INISIALISASI APLIKASI
     // =========================================================================
     
     async function initializeApp() {
         console.log('🚀 Initializing app...');
         
-        // Step 1: Populate dropdown
         populateLineDropdown();
-        
-        // Step 2: Generate table rows
         generateDataEntryRows();
         
-        // Step 3: PENTING - Tunggu sebentar agar DOM benar-benar siap
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        // Step 4: Restore draft SETELAH DOM siap
-        const restored = restoreDraftFromLocalStorage();
+        // PENTING: Restore harus await karena sekarang async
+        const restored = await restoreDraftFromLocalStorage();
         
-        // Step 5: Setup event listeners TERAKHIR
         setupEventListeners();
         
-        // Step 6: Load saved files
         const existingData = await getFromDB();
         await renderSavedFilesOptimized(existingData, null);
         
-        console.log('✓ App initialized', restored ? '(with restored data)' : '(no draft)');
+        console.log('✓ App initialized', restored ? '(with restored data + photos)' : '(no draft)');
     }
 
     function populateLineDropdown() {
@@ -475,11 +511,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================================
-    // 4. PENGATURAN EVENT LISTENERS (DIPERBAIKI)
+    // 4. PENGATURAN EVENT LISTENERS
     // =========================================================================
     
     function setupEventListeners() {
-        // Autocomplete
         DOMElements.styleNumberInput.addEventListener('input', handleAutocompleteInput);
         DOMElements.autocompleteResults.addEventListener('click', handleAutocompleteSelect);
         document.addEventListener('click', (e) => {
@@ -488,39 +523,27 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // Table events
         DOMElements.dataEntryBody.addEventListener('change', handleTableChange);
         DOMElements.dataEntryBody.addEventListener('click', handleTableClick);
         
-        // Save button
         DOMElements.saveButton.addEventListener('click', handleSaveValidation);
         
-        // Modal
         DOMElements.modalConfirmBtn.addEventListener('click', () => currentModalAction.onConfirm?.());
         DOMElements.modalCancelBtn.addEventListener('click', () => currentModalAction.onCancel?.());
         
-        // Saved files
         DOMElements.savedFilesList.addEventListener('click', handleSavedFilesActions);
 
-        // Auto-save listeners
         setupAutoSaveListeners();
         
         console.log('✓ Event listeners attached');
     }
 
-    /**
-     * Setup event listeners untuk auto-save (DIPERBAIKI)
-     */
     function setupAutoSaveListeners() {
-        // Form inputs - save dengan debounce
         DOMElements.auditor.addEventListener('input', () => saveDraftToLocalStorage(false));
-        DOMElements.validationCategory.addEventListener('change', () => saveDraftToLocalStorage(true)); // Immediate
+        DOMElements.validationCategory.addEventListener('change', () => saveDraftToLocalStorage(true));
         DOMElements.styleNumberInput.addEventListener('input', () => saveDraftToLocalStorage(false));
         DOMElements.model.addEventListener('input', () => saveDraftToLocalStorage(false));
-        DOMElements.line.addEventListener('change', () => saveDraftToLocalStorage(true)); // Immediate
-
-        // HAPUS event listener duplikat di table
-        // Sudah ditangani di handleTableChange dan handleTableClick
+        DOMElements.line.addEventListener('change', () => saveDraftToLocalStorage(true));
         
         console.log('✓ Auto-save listeners ready');
     }
@@ -562,13 +585,12 @@ document.addEventListener('DOMContentLoaded', () => {
             DOMElements.model.value = styleModelMap[selectedStyle] || '';
             DOMElements.autocompleteResults.style.display = 'none';
             
-            // Auto-save immediate
             saveDraftToLocalStorage(true);
         }
     }
 
     // =========================================================================
-    // 6. HANDLER TABEL (Status, Defect, Foto) - DIPERBAIKI
+    // 6. HANDLER TABEL (Status, Defect, Foto)
     // =========================================================================
 
     function handleTableChange(e) {
@@ -607,7 +629,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 resetPhotosForRow(tr);
             }
             
-            // Auto-save IMMEDIATE karena ini perubahan penting
             saveDraftToLocalStorage(true);
         }
 
@@ -639,7 +660,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 onConfirm: () => { 
                     resetRow(tr); 
                     hideModal(); 
-                    saveDraftToLocalStorage(true); // Immediate save
+                    saveDraftToLocalStorage(true);
                 }
             });
         } 
@@ -716,7 +737,6 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.dataset.photos = JSON.stringify(photos);
             updatePhotoGallery(tr);
             
-            // Auto-save IMMEDIATE setelah upload foto
             saveDraftToLocalStorage(true);
         });
 
@@ -746,7 +766,6 @@ document.addEventListener('DOMContentLoaded', () => {
         tr.dataset.photos = JSON.stringify(photos);
         updatePhotoGallery(tr);
         
-        // Auto-save immediate
         saveDraftToLocalStorage(true);
     }
     
@@ -833,7 +852,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateDefectTags(tr);
                 hideModal();
                 
-                // Auto-save IMMEDIATE setelah pilih defect
                 saveDraftToLocalStorage(true);
             },
         });
@@ -992,8 +1010,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             resetFullForm();
             
-            // PENTING: Hapus draft SETELAH berhasil save
-            clearDraftFromLocalStorage();
+            // Hapus draft metadata DAN foto
+            await clearDraftFromLocalStorage();
 
             await renderSavedFilesOptimized(existingData, fileData);
         } catch (error) {
