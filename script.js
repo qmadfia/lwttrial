@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <span style="font-size: 20px;">💾</span>
                 <div>
                     <div style="font-weight: bold; margin-bottom: 4px;">Data Dipulihkan</div>
-                    <div style="font-size: 12px; opacity: 0.9;">${count} pair + foto dikembalikan ✓</div>
+                    <div style="font-size: 12px; opacity: 0.9;">${count} pair + foto direfresh ✓</div>
                 </div>
             </div>
         `;
