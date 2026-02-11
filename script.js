@@ -225,13 +225,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Foto disimpan ke IndexedDB secara terpisah
                 const photoSavePromises = [];
                 
-                DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
-                    const photos = JSON.parse(tr.dataset.photos || '[]');
-                    
-                    const pairData = {
-                        pairNumber: tr.dataset.pairNumber,
-                        status: tr.querySelector('.status-select').value,
-                        defects: tr.dataset.defects || '[]',
+DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
+    const photos = JSON.parse(tr.dataset.photos || '[]');
+    
+    // BARU: Ambil status dari radio button yang ter-check
+    const checkedRadio = tr.querySelector('.status-radio:checked');
+    const statusValue = checkedRadio ? checkedRadio.value : '';
+    
+    const pairData = {
+        pairNumber: tr.dataset.pairNumber,
+        status: statusValue,
+        defects: tr.dataset.defects || '[]',
                         otherDefects: tr.dataset.otherDefects || '[]',
                         photoCount: photos.length // Hanya simpan jumlah foto
                     };
@@ -306,18 +310,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 try {
                     // Restore status
-                    const statusSelect = tr.querySelector('.status-select');
-                    statusSelect.value = pairData.status || '';
-                    
-                    if (statusSelect.value) {
-                        statusSelect.classList.add('status-selected');
-                        statusSelect.classList.remove('status-ok', 'status-ng');
-                        if (statusSelect.value === 'OK') {
-                            statusSelect.classList.add('status-ok');
-                        } else if (statusSelect.value === 'NG') {
-                            statusSelect.classList.add('status-ng');
-                        }
-                    }
+// Restore status (BARU: untuk radio button)
+const statusRadios = tr.querySelectorAll('.status-radio');
+const savedStatus = pairData.status || '';
+
+statusRadios.forEach(radio => {
+    if (radio.value === savedStatus) {
+        radio.checked = true;
+    }
+});
 
                     // Restore defects
                     tr.dataset.defects = pairData.defects;
@@ -470,45 +471,50 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function generateDataEntryRows() {
-        const tbody = DOMElements.dataEntryBody;
-        tbody.innerHTML = '';
-        for (let i = 1; i <= TOTAL_PAIRS; i++) {
-            const tr = document.createElement('tr');
-            tr.dataset.pairNumber = i;
-            tr.dataset.photos = '[]';
-            tr.dataset.defects = '[]';
-            tr.dataset.otherDefects = '[]';
-            tr.innerHTML = `
-                <td class="col-pair">${i}</td>
-                <td class="col-status">
-                    <select class="status-select">
-                        <option value="">Pilih</option>
-                        <option value="OK">OK</option>
-                        <option value="NG">NG</option>
-                    </select>
-                </td>
-                <td class="col-defect">
-                    <div class="defect-input-container disabled">
-                        <div class="defect-tags-wrapper">
-                            <span class="placeholder-text">Pilih 'NG' untuk mengisi</span>
-                        </div>
+    const tbody = DOMElements.dataEntryBody;
+    tbody.innerHTML = '';
+    for (let i = 1; i <= TOTAL_PAIRS; i++) {
+        const tr = document.createElement('tr');
+        tr.dataset.pairNumber = i;
+        tr.dataset.photos = '[]';
+        tr.dataset.defects = '[]';
+        tr.dataset.otherDefects = '[]';
+        tr.innerHTML = `
+            <td class="col-pair">${i}</td>
+            <td class="col-status">
+                <div class="status-radio-group">
+                    <label class="radio-label radio-ok">
+                        <input type="radio" name="status-${i}" value="OK" class="status-radio">
+                        <span class="radio-custom">OK</span>
+                    </label>
+                    <label class="radio-label radio-ng">
+                        <input type="radio" name="status-${i}" value="NG" class="status-radio">
+                        <span class="radio-custom">NG</span>
+                    </label>
+                </div>
+            </td>
+            <td class="col-defect">
+                <div class="defect-input-container disabled">
+                    <div class="defect-tags-wrapper">
+                        <span class="placeholder-text">Pilih 'NG' untuk mengisi</span>
                     </div>
-                </td>
-                <td class="col-photo">
-                    <div class="photo-container">
-                        <div class="photo-gallery"></div>
-                        <span class="photo-feedback">Belum ada foto.</span>
-                        <button class="add-photo-btn" style="display:none;">+ Tambah Foto</button>
-                        <input type="file" accept="image/*" class="hidden-file-input" multiple style="display:none;">
-                    </div>
-                </td>
-                <td class="col-action">
-                    <button class="table-action-btn delete-row-btn" title="Hapus Data Baris Ini">🗑️</button>
-                </td>
-            `;
-            tbody.appendChild(tr);
-        }
+                </div>
+            </td>
+            <td class="col-photo">
+                <div class="photo-container">
+                    <div class="photo-gallery"></div>
+                    <span class="photo-feedback">Belum ada foto.</span>
+                    <button class="add-photo-btn" style="display:none;">+ Tambah Foto</button>
+                    <input type="file" accept="image/*" class="hidden-file-input" multiple style="display:none;">
+                </div>
+            </td>
+            <td class="col-action">
+                <button class="table-action-btn delete-row-btn" title="Hapus Data Baris Ini">🗑️</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
     }
+}
 
     // =========================================================================
     // 4. PENGATURAN EVENT LISTENERS
@@ -593,49 +599,43 @@ document.addEventListener('DOMContentLoaded', () => {
     // 6. HANDLER TABEL (Status, Defect, Foto)
     // =========================================================================
 
-    function handleTableChange(e) {
-        const target = e.target;
+function handleTableChange(e) {
+    const target = e.target;
 
-        if (target.classList.contains('status-select')) {
-            const tr = target.closest('tr');
-            const addPhotoButton = tr.querySelector('.add-photo-btn');
-            const defectContainer = tr.querySelector('.defect-input-container');
-            
-            target.classList.add('status-selected');
-            target.classList.remove('status-ok', 'status-ng');
-            if (target.value === 'OK') {
-                target.classList.add('status-ok');
-            } else if (target.value === 'NG') {
-                target.classList.add('status-ng');
+    // BARU: Handle radio button status
+    if (target.classList.contains('status-radio')) {
+        const tr = target.closest('tr');
+        const addPhotoButton = tr.querySelector('.add-photo-btn');
+        const defectContainer = tr.querySelector('.defect-input-container');
+        const statusValue = target.value;
+
+        if (statusValue === 'NG') {
+            defectContainer.classList.remove('disabled');
+            defectContainer.classList.add('enabled');
+            const placeholder = defectContainer.querySelector('.placeholder-text');
+            if (placeholder) {
+                placeholder.textContent = 'Klik untuk pilih defect...';
             }
-
-            if (target.value === 'NG') {
-                defectContainer.classList.remove('disabled');
-                defectContainer.classList.add('enabled');
-                const placeholder = defectContainer.querySelector('.placeholder-text');
-                if (placeholder) {
-                    placeholder.textContent = 'Klik untuk pilih defect...';
-                }
-                addPhotoButton.style.display = 'block';
-            } else {
-                defectContainer.classList.remove('enabled');
-                defectContainer.classList.add('disabled');
-                const placeholder = defectContainer.querySelector('.placeholder-text');
-                if (placeholder) {
-                    placeholder.textContent = "Pilih 'NG' untuk mengisi";
-                }
-                addPhotoButton.style.display = 'none';
-                resetDefectsForRow(tr);
-                resetPhotosForRow(tr);
+            addPhotoButton.style.display = 'block';
+        } else if (statusValue === 'OK') {
+            defectContainer.classList.remove('enabled');
+            defectContainer.classList.add('disabled');
+            const placeholder = defectContainer.querySelector('.placeholder-text');
+            if (placeholder) {
+                placeholder.textContent = "Pilih 'NG' untuk mengisi";
             }
-            
-            saveDraftToLocalStorage(true);
+            addPhotoButton.style.display = 'none';
+            resetDefectsForRow(tr);
+            resetPhotosForRow(tr);
         }
-
-        if (target.classList.contains('hidden-file-input')) {
-            handleImageUpload(e);
-        }
+        
+        saveDraftToLocalStorage(true);
     }
+
+    if (target.classList.contains('hidden-file-input')) {
+        handleImageUpload(e);
+    }
+}
 
     function handleTableClick(e) {
         const target = e.target;
@@ -769,20 +769,22 @@ document.addEventListener('DOMContentLoaded', () => {
         saveDraftToLocalStorage(true);
     }
     
-    function resetRow(tr) {
-        const statusSelect = tr.querySelector('.status-select');
-        statusSelect.value = "";
-        statusSelect.className = 'status-select';
-        
-        const defectContainer = tr.querySelector('.defect-input-container');
-        defectContainer.classList.remove('enabled');
-        defectContainer.classList.add('disabled');
-        
-        tr.querySelector('.add-photo-btn').style.display = 'none';
+function resetRow(tr) {
+    // BARU: Reset radio button
+    const statusRadios = tr.querySelectorAll('.status-radio');
+    statusRadios.forEach(radio => {
+        radio.checked = false;
+    });
+    
+    const defectContainer = tr.querySelector('.defect-input-container');
+    defectContainer.classList.remove('enabled');
+    defectContainer.classList.add('disabled');
+    
+    tr.querySelector('.add-photo-btn').style.display = 'none';
 
-        resetDefectsForRow(tr);
-        resetPhotosForRow(tr);
-    }
+    resetDefectsForRow(tr);
+    resetPhotosForRow(tr);
+}
 
     function resetDefectsForRow(tr) {
         tr.dataset.defects = '[]';
@@ -826,35 +828,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 ${otherDefectsInputHTML}
             </div>`;
         
-        showModal({
-            title: `Pilih Defect untuk Pair #${tr.dataset.pairNumber}`,
-            body: modalBodyHTML,
-            confirmText: 'Simpan Pilihan',
-            onConfirm: () => {
-                const selected = [];
-                const otherDefectDetails = [];
-                
-                document.querySelectorAll('#defect-selection-modal input[type="checkbox"]:checked').forEach(cb => {
-                    if (cb.value === 'Other Defects') {
-                        const detailInput = document.getElementById('other-defects-detail').value.trim();
-                        if (detailInput) {
-                            const details = detailInput.split(',').map(d => d.trim()).filter(d => d);
-                            otherDefectDetails.push(...details);
-                            selected.push(cb.value);
-                        }
-                    } else {
-                        selected.push(cb.value);
-                    }
-                });
-                
-                tr.dataset.defects = JSON.stringify(selected);
-                tr.dataset.otherDefects = JSON.stringify(otherDefectDetails);
-                updateDefectTags(tr);
-                hideModal();
-                
-                saveDraftToLocalStorage(true);
-            },
+showModal({
+    title: `Pilih Defect untuk Pair #${tr.dataset.pairNumber}`,
+    body: modalBodyHTML,
+    confirmText: 'Simpan Pilihan',
+    onConfirm: () => {
+        const selected = [];
+        const otherDefectDetails = [];
+        
+        document.querySelectorAll('#defect-selection-modal input[type="checkbox"]:checked').forEach(cb => {
+            if (cb.value === 'Other Defects') {
+                const detailInput = document.getElementById('other-defects-detail').value.trim();
+                if (detailInput) {
+                    const details = detailInput.split(',').map(d => d.trim()).filter(d => d);
+                    otherDefectDetails.push(...details);
+                    selected.push(cb.value);
+                }
+            } else {
+                selected.push(cb.value);
+            }
         });
+        
+        tr.dataset.defects = JSON.stringify(selected);
+        tr.dataset.otherDefects = JSON.stringify(otherDefectDetails);
+        updateDefectTags(tr);
+        hideModal();
+        
+        saveDraftToLocalStorage(true);
+    },
+});
+
+// BARU: Auto-focus search bar setelah modal muncul
+setTimeout(() => {
+    const searchBar = document.querySelector('#defect-selection-modal .search-bar');
+    if (searchBar) {
+        searchBar.focus();
+    }
+}, 100); // Delay 100ms untuk memastikan modal sudah render
         
         document.querySelector('#defect-selection-modal .search-bar').addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
@@ -931,7 +941,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         
-        const inspectedCount = Array.from(document.querySelectorAll('.status-select')).filter(s => s.value !== "").length;
+const inspectedCount = Array.from(document.querySelectorAll('.status-radio:checked')).length;
         if (inspectedCount < TOTAL_PAIRS) {
             showModal({
                 title: 'Konfirmasi Penyimpanan',
@@ -961,12 +971,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 line: DOMElements.line.value
             };
 
-            const pairsData = Array.from(DOMElements.dataEntryBody.querySelectorAll('tr')).map(tr => {
-                try {
-                    const dataset = tr.dataset;
-                    return {
-                        pairNumber: parseInt(dataset.pairNumber),
-                        status: tr.querySelector('.status-select').value,
+const pairsData = Array.from(DOMElements.dataEntryBody.querySelectorAll('tr')).map(tr => {
+    try {
+        const dataset = tr.dataset;
+        const checkedRadio = tr.querySelector('.status-radio:checked');
+        return {
+            pairNumber: parseInt(dataset.pairNumber),
+            status: checkedRadio ? checkedRadio.value : '',
                         defects: dataset.defects ? JSON.parse(dataset.defects) : [],
                         otherDefects: dataset.otherDefects ? JSON.parse(dataset.otherDefects) : [],
                         photos: dataset.photos ? JSON.parse(dataset.photos) : []
