@@ -1,6 +1,6 @@
 /**
  * @file script.js
- * @description Main logic for the Line Walk Through application (V7 - Photos in IndexedDB).
+ * @description Main logic for the Line Walk Through application (V7 - Photos in IndexedDB + Radio Button Status).
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // =========================================================================
     const STORAGE_KEY = 'lineWalkThroughData';
     const DRAFT_KEY = 'lineWalkThroughDraft';
-    const DRAFT_PHOTOS_STORE = 'draftPhotos'; // BARU: Store untuk foto draft
+    const DRAFT_PHOTOS_STORE = 'draftPhotos';
     const TOTAL_PAIRS = 20;
     let currentModalAction = { onConfirm: null, onCancel: null };
     let saveTimeout = null;
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // IndexedDB setup
     const DB_NAME = 'LWT_DB';
-    const DB_VERSION = 2; // NAIK versi karena tambah store baru
+    const DB_VERSION = 2;
     const STORE_NAME = 'inspections';
 
     function openDB() {
@@ -31,12 +31,10 @@ document.addEventListener('DOMContentLoaded', () => {
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
                 
-                // Store untuk data final
                 if (!db.objectStoreNames.contains(STORE_NAME)) {
                     db.createObjectStore(STORE_NAME, { keyPath: 'id' });
                 }
                 
-                // BARU: Store untuk foto draft
                 if (!db.objectStoreNames.contains(DRAFT_PHOTOS_STORE)) {
                     db.createObjectStore(DRAFT_PHOTOS_STORE, { keyPath: 'pairNumber' });
                 }
@@ -80,12 +78,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================================
-    // BARU: FUNGSI UNTUK SIMPAN/AMBIL FOTO DRAFT KE INDEXEDDB
+    // FUNGSI UNTUK SIMPAN/AMBIL FOTO DRAFT KE INDEXEDDB
     // =========================================================================
     
-    /**
-     * Simpan foto untuk 1 pair ke IndexedDB
-     */
     async function saveDraftPhotos(pairNumber, photos) {
         try {
             const db = await openDB();
@@ -103,9 +98,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /**
-     * Ambil foto untuk 1 pair dari IndexedDB
-     */
     async function getDraftPhotos(pairNumber) {
         try {
             const db = await openDB();
@@ -126,9 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /**
-     * Hapus semua foto draft dari IndexedDB
-     */
     async function clearAllDraftPhotos() {
         try {
             const db = await openDB();
@@ -199,13 +188,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // =========================================================================
-    // 2. FUNGSI AUTO-SAVE & AUTO-RESTORE (DIPERBAIKI - FOTO KE INDEXEDDB)
+    // 2. FUNGSI AUTO-SAVE & AUTO-RESTORE
     // =========================================================================
     
-    /**
-     * Menyimpan draft data ke localStorage (tanpa foto)
-     * Foto disimpan terpisah ke IndexedDB
-     */
     function saveDraftToLocalStorage(immediate = false) {
         const actualSave = async () => {
             try {
@@ -221,27 +206,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     pairs: []
                 };
 
-                // Simpan metadata (tanpa foto) ke localStorage
-                // Foto disimpan ke IndexedDB secara terpisah
                 const photoSavePromises = [];
                 
-DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
-    const photos = JSON.parse(tr.dataset.photos || '[]');
-    
-    // BARU: Ambil status dari radio button yang ter-check
-    const checkedRadio = tr.querySelector('.status-radio:checked');
-    const statusValue = checkedRadio ? checkedRadio.value : '';
-    
-    const pairData = {
-        pairNumber: tr.dataset.pairNumber,
-        status: statusValue,
-        defects: tr.dataset.defects || '[]',
+                DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
+                    const photos = JSON.parse(tr.dataset.photos || '[]');
+                    
+                    // BARU: Ambil status dari radio button
+                    const checkedRadio = tr.querySelector('.status-radio:checked');
+                    const statusValue = checkedRadio ? checkedRadio.value : '';
+                    
+                    const pairData = {
+                        pairNumber: tr.dataset.pairNumber,
+                        status: statusValue,
+                        defects: tr.dataset.defects || '[]',
                         otherDefects: tr.dataset.otherDefects || '[]',
-                        photoCount: photos.length // Hanya simpan jumlah foto
+                        photoCount: photos.length
                     };
                     draftData.pairs.push(pairData);
                     
-                    // BARU: Simpan foto ke IndexedDB
                     if (photos.length > 0) {
                         photoSavePromises.push(
                             saveDraftPhotos(tr.dataset.pairNumber, photos)
@@ -249,10 +231,8 @@ DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
                     }
                 });
 
-                // Tunggu semua foto tersimpan
                 await Promise.all(photoSavePromises);
 
-                // Simpan metadata ke localStorage
                 const dataString = JSON.stringify(draftData);
                 localStorage.setItem(DRAFT_KEY, dataString);
                 
@@ -272,9 +252,6 @@ DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
         }
     }
 
-    /**
-     * Memulihkan draft data dari localStorage dan foto dari IndexedDB
-     */
     async function restoreDraftFromLocalStorage() {
         try {
             const savedDraft = localStorage.getItem(DRAFT_KEY);
@@ -292,14 +269,12 @@ DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
 
             console.log('📦 Restoring draft from:', new Date(draftData.timestamp).toLocaleString());
 
-            // Restore form data
             DOMElements.auditor.value = draftData.form.auditor || '';
             DOMElements.validationCategory.value = draftData.form.validationCategory || '';
             DOMElements.styleNumberInput.value = draftData.form.styleNumber || '';
             DOMElements.model.value = draftData.form.model || '';
             DOMElements.line.value = draftData.form.line || '';
 
-            // Restore pairs data
             let restoredCount = 0;
             const restorePromises = draftData.pairs.map(async (pairData) => {
                 const tr = DOMElements.dataEntryBody.querySelector(`tr[data-pair-number="${pairData.pairNumber}"]`);
@@ -309,30 +284,26 @@ DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
                 }
 
                 try {
-                    // Restore status
-// Restore status (BARU: untuk radio button)
-const statusRadios = tr.querySelectorAll('.status-radio');
-const savedStatus = pairData.status || '';
+                    // BARU: Restore status untuk radio button
+                    const statusRadios = tr.querySelectorAll('.status-radio');
+                    const savedStatus = pairData.status || '';
 
-statusRadios.forEach(radio => {
-    if (radio.value === savedStatus) {
-        radio.checked = true;
-    }
-});
+                    statusRadios.forEach(radio => {
+                        if (radio.value === savedStatus) {
+                            radio.checked = true;
+                        }
+                    });
 
-                    // Restore defects
                     tr.dataset.defects = pairData.defects;
                     tr.dataset.otherDefects = pairData.otherDefects;
 
-                    // BARU: Restore photos dari IndexedDB
                     const photos = await getDraftPhotos(pairData.pairNumber);
                     tr.dataset.photos = JSON.stringify(photos);
 
-                    // Update UI
                     const defectContainer = tr.querySelector('.defect-input-container');
                     const addPhotoButton = tr.querySelector('.add-photo-btn');
                     
-                    if (statusSelect.value === 'NG') {
+                    if (savedStatus === 'NG') {
                         defectContainer.classList.remove('disabled');
                         defectContainer.classList.add('enabled');
                         const placeholder = defectContainer.querySelector('.placeholder-text');
@@ -347,7 +318,7 @@ statusRadios.forEach(radio => {
                     }
 
                     updateDefectTags(tr);
-                    updatePhotoGallery(tr); // FOTO AKAN MUNCUL KEMBALI!
+                    updatePhotoGallery(tr);
                     
                     if (pairData.status) restoredCount++;
                 } catch (error) {
@@ -355,7 +326,6 @@ statusRadios.forEach(radio => {
                 }
             });
 
-            // Tunggu semua restore selesai
             await Promise.all(restorePromises);
 
             if (restoredCount > 0) {
@@ -377,13 +347,10 @@ statusRadios.forEach(radio => {
         }
     }
 
-    /**
-     * Menghapus draft dari localStorage DAN foto dari IndexedDB
-     */
     async function clearDraftFromLocalStorage() {
         try {
             localStorage.removeItem(DRAFT_KEY);
-            await clearAllDraftPhotos(); // Hapus foto juga
+            await clearAllDraftPhotos();
             console.log('✓ Draft cleared (metadata + photos)');
         } catch (error) {
             console.error('❌ Failed to clear draft:', error);
@@ -452,7 +419,6 @@ statusRadios.forEach(radio => {
         
         await new Promise(resolve => setTimeout(resolve, 100));
         
-        // PENTING: Restore harus await karena sekarang async
         const restored = await restoreDraftFromLocalStorage();
         
         setupEventListeners();
@@ -471,50 +437,50 @@ statusRadios.forEach(radio => {
     }
 
     function generateDataEntryRows() {
-    const tbody = DOMElements.dataEntryBody;
-    tbody.innerHTML = '';
-    for (let i = 1; i <= TOTAL_PAIRS; i++) {
-        const tr = document.createElement('tr');
-        tr.dataset.pairNumber = i;
-        tr.dataset.photos = '[]';
-        tr.dataset.defects = '[]';
-        tr.dataset.otherDefects = '[]';
-        tr.innerHTML = `
-            <td class="col-pair">${i}</td>
-            <td class="col-status">
-                <div class="status-radio-group">
-                    <label class="radio-label radio-ok">
-                        <input type="radio" name="status-${i}" value="OK" class="status-radio">
-                        <span class="radio-custom">OK</span>
-                    </label>
-                    <label class="radio-label radio-ng">
-                        <input type="radio" name="status-${i}" value="NG" class="status-radio">
-                        <span class="radio-custom">NG</span>
-                    </label>
-                </div>
-            </td>
-            <td class="col-defect">
-                <div class="defect-input-container disabled">
-                    <div class="defect-tags-wrapper">
-                        <span class="placeholder-text">Pilih 'NG' untuk mengisi</span>
+        const tbody = DOMElements.dataEntryBody;
+        tbody.innerHTML = '';
+        for (let i = 1; i <= TOTAL_PAIRS; i++) {
+            const tr = document.createElement('tr');
+            tr.dataset.pairNumber = i;
+            tr.dataset.photos = '[]';
+            tr.dataset.defects = '[]';
+            tr.dataset.otherDefects = '[]';
+            tr.innerHTML = `
+                <td class="col-pair">${i}</td>
+                <td class="col-status">
+                    <div class="status-radio-group">
+                        <label class="radio-label radio-ok">
+                            <input type="radio" name="status-${i}" value="OK" class="status-radio">
+                            <span class="radio-custom">OK</span>
+                        </label>
+                        <label class="radio-label radio-ng">
+                            <input type="radio" name="status-${i}" value="NG" class="status-radio">
+                            <span class="radio-custom">NG</span>
+                        </label>
                     </div>
-                </div>
-            </td>
-            <td class="col-photo">
-                <div class="photo-container">
-                    <div class="photo-gallery"></div>
-                    <span class="photo-feedback">Belum ada foto.</span>
-                    <button class="add-photo-btn" style="display:none;">+ Tambah Foto</button>
-                    <input type="file" accept="image/*" class="hidden-file-input" multiple style="display:none;">
-                </div>
-            </td>
-            <td class="col-action">
-                <button class="table-action-btn delete-row-btn" title="Hapus Data Baris Ini">🗑️</button>
-            </td>
-        `;
-        tbody.appendChild(tr);
+                </td>
+                <td class="col-defect">
+                    <div class="defect-input-container disabled">
+                        <div class="defect-tags-wrapper">
+                            <span class="placeholder-text">Pilih 'NG' untuk mengisi</span>
+                        </div>
+                    </div>
+                </td>
+                <td class="col-photo">
+                    <div class="photo-container">
+                        <div class="photo-gallery"></div>
+                        <span class="photo-feedback">Belum ada foto.</span>
+                        <button class="add-photo-btn" style="display:none;">+ Tambah Foto</button>
+                        <input type="file" accept="image/*" class="hidden-file-input" multiple style="display:none;">
+                    </div>
+                </td>
+                <td class="col-action">
+                    <button class="table-action-btn delete-row-btn" title="Hapus Data Baris Ini">🗑️</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        }
     }
-}
 
     // =========================================================================
     // 4. PENGATURAN EVENT LISTENERS
@@ -599,43 +565,43 @@ statusRadios.forEach(radio => {
     // 6. HANDLER TABEL (Status, Defect, Foto)
     // =========================================================================
 
-function handleTableChange(e) {
-    const target = e.target;
+    function handleTableChange(e) {
+        const target = e.target;
 
-    // BARU: Handle radio button status
-    if (target.classList.contains('status-radio')) {
-        const tr = target.closest('tr');
-        const addPhotoButton = tr.querySelector('.add-photo-btn');
-        const defectContainer = tr.querySelector('.defect-input-container');
-        const statusValue = target.value;
+        // BARU: Handle radio button status
+        if (target.classList.contains('status-radio')) {
+            const tr = target.closest('tr');
+            const addPhotoButton = tr.querySelector('.add-photo-btn');
+            const defectContainer = tr.querySelector('.defect-input-container');
+            const statusValue = target.value;
 
-        if (statusValue === 'NG') {
-            defectContainer.classList.remove('disabled');
-            defectContainer.classList.add('enabled');
-            const placeholder = defectContainer.querySelector('.placeholder-text');
-            if (placeholder) {
-                placeholder.textContent = 'Klik untuk pilih defect...';
+            if (statusValue === 'NG') {
+                defectContainer.classList.remove('disabled');
+                defectContainer.classList.add('enabled');
+                const placeholder = defectContainer.querySelector('.placeholder-text');
+                if (placeholder) {
+                    placeholder.textContent = 'Klik untuk pilih defect...';
+                }
+                addPhotoButton.style.display = 'block';
+            } else if (statusValue === 'OK') {
+                defectContainer.classList.remove('enabled');
+                defectContainer.classList.add('disabled');
+                const placeholder = defectContainer.querySelector('.placeholder-text');
+                if (placeholder) {
+                    placeholder.textContent = "Pilih 'NG' untuk mengisi";
+                }
+                addPhotoButton.style.display = 'none';
+                resetDefectsForRow(tr);
+                resetPhotosForRow(tr);
             }
-            addPhotoButton.style.display = 'block';
-        } else if (statusValue === 'OK') {
-            defectContainer.classList.remove('enabled');
-            defectContainer.classList.add('disabled');
-            const placeholder = defectContainer.querySelector('.placeholder-text');
-            if (placeholder) {
-                placeholder.textContent = "Pilih 'NG' untuk mengisi";
-            }
-            addPhotoButton.style.display = 'none';
-            resetDefectsForRow(tr);
-            resetPhotosForRow(tr);
+            
+            saveDraftToLocalStorage(true);
         }
-        
-        saveDraftToLocalStorage(true);
-    }
 
-    if (target.classList.contains('hidden-file-input')) {
-        handleImageUpload(e);
+        if (target.classList.contains('hidden-file-input')) {
+            handleImageUpload(e);
+        }
     }
-}
 
     function handleTableClick(e) {
         const target = e.target;
@@ -769,22 +735,22 @@ function handleTableChange(e) {
         saveDraftToLocalStorage(true);
     }
     
-function resetRow(tr) {
-    // BARU: Reset radio button
-    const statusRadios = tr.querySelectorAll('.status-radio');
-    statusRadios.forEach(radio => {
-        radio.checked = false;
-    });
-    
-    const defectContainer = tr.querySelector('.defect-input-container');
-    defectContainer.classList.remove('enabled');
-    defectContainer.classList.add('disabled');
-    
-    tr.querySelector('.add-photo-btn').style.display = 'none';
+    function resetRow(tr) {
+        // BARU: Reset radio button
+        const statusRadios = tr.querySelectorAll('.status-radio');
+        statusRadios.forEach(radio => {
+            radio.checked = false;
+        });
+        
+        const defectContainer = tr.querySelector('.defect-input-container');
+        defectContainer.classList.remove('enabled');
+        defectContainer.classList.add('disabled');
+        
+        tr.querySelector('.add-photo-btn').style.display = 'none';
 
-    resetDefectsForRow(tr);
-    resetPhotosForRow(tr);
-}
+        resetDefectsForRow(tr);
+        resetPhotosForRow(tr);
+    }
 
     function resetDefectsForRow(tr) {
         tr.dataset.defects = '[]';
@@ -823,48 +789,48 @@ function resetRow(tr) {
         
         const modalBodyHTML = `
             <div id="defect-selection-modal">
-                <input type="text" class="search-bar" placeholder="Cari tipe defect...">
+                <input type="text" class="search-bar" id="defect-search-input" placeholder="Cari tipe defect...">
                 <div class="options-container">${optionsHTML}</div>
                 ${otherDefectsInputHTML}
             </div>`;
         
-showModal({
-    title: `Pilih Defect untuk Pair #${tr.dataset.pairNumber}`,
-    body: modalBodyHTML,
-    confirmText: 'Simpan Pilihan',
-    onConfirm: () => {
-        const selected = [];
-        const otherDefectDetails = [];
-        
-        document.querySelectorAll('#defect-selection-modal input[type="checkbox"]:checked').forEach(cb => {
-            if (cb.value === 'Other Defects') {
-                const detailInput = document.getElementById('other-defects-detail').value.trim();
-                if (detailInput) {
-                    const details = detailInput.split(',').map(d => d.trim()).filter(d => d);
-                    otherDefectDetails.push(...details);
-                    selected.push(cb.value);
-                }
-            } else {
-                selected.push(cb.value);
-            }
+        showModal({
+            title: `Pilih Defect untuk Pair #${tr.dataset.pairNumber}`,
+            body: modalBodyHTML,
+            confirmText: 'Simpan Pilihan',
+            onConfirm: () => {
+                const selected = [];
+                const otherDefectDetails = [];
+                
+                document.querySelectorAll('#defect-selection-modal input[type="checkbox"]:checked').forEach(cb => {
+                    if (cb.value === 'Other Defects') {
+                        const detailInput = document.getElementById('other-defects-detail').value.trim();
+                        if (detailInput) {
+                            const details = detailInput.split(',').map(d => d.trim()).filter(d => d);
+                            otherDefectDetails.push(...details);
+                            selected.push(cb.value);
+                        }
+                    } else {
+                        selected.push(cb.value);
+                    }
+                });
+                
+                tr.dataset.defects = JSON.stringify(selected);
+                tr.dataset.otherDefects = JSON.stringify(otherDefectDetails);
+                updateDefectTags(tr);
+                hideModal();
+                
+                saveDraftToLocalStorage(true);
+            },
         });
         
-        tr.dataset.defects = JSON.stringify(selected);
-        tr.dataset.otherDefects = JSON.stringify(otherDefectDetails);
-        updateDefectTags(tr);
-        hideModal();
-        
-        saveDraftToLocalStorage(true);
-    },
-});
-
-// BARU: Auto-focus search bar setelah modal muncul
-setTimeout(() => {
-    const searchBar = document.querySelector('#defect-selection-modal .search-bar');
-    if (searchBar) {
-        searchBar.focus();
-    }
-}, 100); // Delay 100ms untuk memastikan modal sudah render
+        // BARU: Auto-focus search bar
+        setTimeout(() => {
+            const searchBar = document.getElementById('defect-search-input');
+            if (searchBar) {
+                searchBar.focus();
+            }
+        }, 100);
         
         document.querySelector('#defect-selection-modal .search-bar').addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
@@ -914,7 +880,8 @@ setTimeout(() => {
         } else {
             const placeholder = document.createElement('span');
             placeholder.className = 'placeholder-text';
-            const status = tr.querySelector('.status-select').value;
+            const checkedRadio = tr.querySelector('.status-radio:checked');
+            const status = checkedRadio ? checkedRadio.value : '';
             placeholder.textContent = status === 'NG' ? 'Klik untuk pilih defect...' : "Pilih 'NG' untuk mengisi";
             wrapper.appendChild(placeholder);
         }
@@ -934,14 +901,15 @@ setTimeout(() => {
         }
         
         for (const tr of DOMElements.dataEntryBody.querySelectorAll('tr')) {
-            const status = tr.querySelector('.status-select').value;
+            const checkedRadio = tr.querySelector('.status-radio:checked');
+            const status = checkedRadio ? checkedRadio.value : '';
             const defects = JSON.parse(tr.dataset.defects || '[]');
             if (status === 'NG' && defects.length === 0) {
                 return alert(`Error: Pair #${tr.dataset.pairNumber} berstatus NG tetapi belum ada tipe defect yang dipilih. Data tidak dapat disimpan.`);
             }
         }
         
-const inspectedCount = Array.from(document.querySelectorAll('.status-radio:checked')).length;
+        const inspectedCount = Array.from(document.querySelectorAll('.status-radio:checked')).length;
         if (inspectedCount < TOTAL_PAIRS) {
             showModal({
                 title: 'Konfirmasi Penyimpanan',
@@ -971,13 +939,13 @@ const inspectedCount = Array.from(document.querySelectorAll('.status-radio:check
                 line: DOMElements.line.value
             };
 
-const pairsData = Array.from(DOMElements.dataEntryBody.querySelectorAll('tr')).map(tr => {
-    try {
-        const dataset = tr.dataset;
-        const checkedRadio = tr.querySelector('.status-radio:checked');
-        return {
-            pairNumber: parseInt(dataset.pairNumber),
-            status: checkedRadio ? checkedRadio.value : '',
+            const pairsData = Array.from(DOMElements.dataEntryBody.querySelectorAll('tr')).map(tr => {
+                try {
+                    const dataset = tr.dataset;
+                    const checkedRadio = tr.querySelector('.status-radio:checked');
+                    return {
+                        pairNumber: parseInt(dataset.pairNumber),
+                        status: checkedRadio ? checkedRadio.value : '',
                         defects: dataset.defects ? JSON.parse(dataset.defects) : [],
                         otherDefects: dataset.otherDefects ? JSON.parse(dataset.otherDefects) : [],
                         photos: dataset.photos ? JSON.parse(dataset.photos) : []
@@ -1021,7 +989,6 @@ const pairsData = Array.from(DOMElements.dataEntryBody.querySelectorAll('tr')).m
 
             resetFullForm();
             
-            // Hapus draft metadata DAN foto
             await clearDraftFromLocalStorage();
 
             await renderSavedFilesOptimized(existingData, fileData);
