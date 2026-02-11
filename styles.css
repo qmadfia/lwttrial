@@ -182,23 +182,74 @@ tbody tr:hover {
 .col-photo { width: 25%; }
 .col-action { width: 15%; }
 
-/* 5.3 Status Select */
-.status-select { 
-    padding: 8px;
-    border-radius: 4px;
-    background-color: var(--light-color); 
-    color: var(--dark-color); 
-    transition: background-color 0.3s, color 0.3s; 
+/* 5.3 Status Radio Button (BARU) */
+.status-radio-group {
+    display: flex;
+    gap: 0; /* Tidak ada jarak - menempel */
+    justify-content: center;
+    align-items: center;
 }
-.status-select.status-selected.status-ok { 
-    background-color: var(--success-color); 
-    color: white; 
-    font-weight: bold; 
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 10px 20px;
+    border: 2px solid var(--border-color);
+    background-color: var(--light-color);
+    transition: all 0.3s ease;
+    font-weight: 500;
+    position: relative;
 }
-.status-select.status-selected.status-ng { 
-    background-color: var(--danger-color); 
-    color: white; 
-    font-weight: bold; 
+
+/* Radio button kiri (OK) */
+.radio-ok {
+    border-radius: 4px 0 0 4px; /* Rounded kiri saja */
+    border-right: 1px solid var(--border-color); /* Border tengah tipis */
+}
+
+/* Radio button kanan (NG) */
+.radio-ng {
+    border-radius: 0 4px 4px 0; /* Rounded kanan saja */
+    border-left: 1px solid var(--border-color); /* Border tengah tipis */
+}
+
+/* Sembunyikan radio asli */
+.status-radio {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Style saat radio dipilih - OK (Hijau) */
+.radio-ok:has(.status-radio:checked) {
+    background-color: var(--success-color);
+    color: white;
+    border-color: var(--success-color);
+    font-weight: bold;
+}
+
+/* Style saat radio dipilih - NG (Merah) */
+.radio-ng:has(.status-radio:checked) {
+    background-color: var(--danger-color);
+    color: white;
+    border-color: var(--danger-color);
+    font-weight: bold;
+}
+
+/* Hover effect */
+.radio-label:hover {
+    background-color: #e0e0e0;
+}
+
+.radio-label:has(.status-radio:checked):hover {
+    opacity: 0.9;
+}
+
+/* Text dalam radio button */
+.radio-custom {
+    user-select: none;
 }
 
 /* 5.4 Defect Input Container */
