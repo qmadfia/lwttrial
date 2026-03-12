@@ -52,10 +52,7 @@ html, body {
     box-shadow: var(--card-shadow);
 }
 .card h2 { 
-    margin-bottom: 20px; 
     color: var(--dark-color); 
-    border-bottom: 2px solid var(--primary-color); 
-    padding-bottom: 10px; 
     font-size: 1.5em;
 }
 
@@ -84,7 +81,8 @@ header h1 {
 // =========================================== */
 .form-grid { 
     display: grid; 
-grid-template-columns: repeat(5, 1fr); /* Ubah ke 4 kolom tetap */    gap: 20px; 
+    grid-template-columns: repeat(5, 1fr);
+    gap: 20px; 
 }
 .form-group label { 
     display: block; 
@@ -143,6 +141,84 @@ grid-template-columns: repeat(5, 1fr); /* Ubah ke 4 kolom tetap */    gap: 20px;
 // 5. Tabel Data Entry dan Interaksi
 // =========================================== */
 
+/* 5.0 Inspection Header dengan PPC Summary */
+.inspection-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--primary-color);
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.inspection-header h2 {
+    margin: 0;
+    padding: 0;
+    border: none;
+    color: var(--dark-color);
+    font-size: 1.5em;
+}
+
+.ppc-summary {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.ppc-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 16px;
+    border-radius: 8px;
+    min-width: 80px;
+    background-color: var(--light-color);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.ppc-ok {
+    border-color: var(--success-color);
+    background-color: #f0fff4;
+}
+
+.ppc-ng {
+    border-color: var(--danger-color);
+    background-color: #fff5f5;
+}
+
+.ppc-rate {
+    border-color: var(--primary-color);
+    background-color: #f0f4ff;
+    min-width: 100px;
+}
+
+.ppc-label {
+    font-size: 0.72em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--secondary-color);
+    margin-bottom: 2px;
+}
+
+.ppc-ok .ppc-label { color: var(--success-color); }
+.ppc-ng .ppc-label { color: var(--danger-color); }
+.ppc-rate .ppc-label { color: var(--primary-color); }
+
+.ppc-value {
+    font-size: 1.4em;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.ppc-ok .ppc-value { color: var(--success-color); }
+.ppc-ng .ppc-value { color: var(--danger-color); }
+.ppc-rate .ppc-value { color: var(--primary-color); }
+
 /* 5.1 Tabel Utama dan Scroll */
 .table-wrapper { 
     max-height: 500px; 
@@ -182,10 +258,10 @@ tbody tr:hover {
 .col-photo { width: 25%; }
 .col-action { width: 15%; }
 
-/* 5.3 Status Radio Button (BARU) */
+/* 5.3 Status Radio Button */
 .status-radio-group {
     display: flex;
-    gap: 0; /* Tidak ada jarak - menempel */
+    gap: 0;
     justify-content: center;
     align-items: center;
 }
@@ -203,26 +279,22 @@ tbody tr:hover {
     position: relative;
 }
 
-/* Radio button kiri (OK) */
 .radio-ok {
-    border-radius: 4px 0 0 4px; /* Rounded kiri saja */
-    border-right: 1px solid var(--border-color); /* Border tengah tipis */
+    border-radius: 4px 0 0 4px;
+    border-right: 1px solid var(--border-color);
 }
 
-/* Radio button kanan (NG) */
 .radio-ng {
-    border-radius: 0 4px 4px 0; /* Rounded kanan saja */
-    border-left: 1px solid var(--border-color); /* Border tengah tipis */
+    border-radius: 0 4px 4px 0;
+    border-left: 1px solid var(--border-color);
 }
 
-/* Sembunyikan radio asli */
 .status-radio {
     position: absolute;
     opacity: 0;
     pointer-events: none;
 }
 
-/* Style saat radio dipilih - OK (Hijau) */
 .radio-ok:has(.status-radio:checked) {
     background-color: var(--success-color);
     color: white;
@@ -230,7 +302,6 @@ tbody tr:hover {
     font-weight: bold;
 }
 
-/* Style saat radio dipilih - NG (Merah) */
 .radio-ng:has(.status-radio:checked) {
     background-color: var(--danger-color);
     color: white;
@@ -238,7 +309,6 @@ tbody tr:hover {
     font-weight: bold;
 }
 
-/* Hover effect */
 .radio-label:hover {
     background-color: #e0e0e0;
 }
@@ -247,7 +317,6 @@ tbody tr:hover {
     opacity: 0.9;
 }
 
-/* Text dalam radio button */
 .radio-custom {
     user-select: none;
 }
@@ -554,7 +623,7 @@ tbody tr:hover {
     justify-content: center;
     align-items: center;
     z-index: 1000;
-    pointer-events: all; /* Memastikan overlay memblokir interaksi */
+    pointer-events: all;
 }
 
 .spinner {
@@ -616,5 +685,13 @@ tbody tr:hover {
     .gdrive-link {
         width: 100%;
         justify-content: center;
+    }
+    .inspection-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .ppc-summary {
+        width: 100%;
+        justify-content: flex-start;
     }
 }
