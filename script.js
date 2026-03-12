@@ -185,7 +185,59 @@ document.addEventListener('DOMContentLoaded', () => {
         modalConfirmBtn: document.getElementById('modal-confirm-btn'),
         modalCancelBtn: document.getElementById('modal-cancel-btn'),
         loadingOverlay: document.getElementById('loading-overlay'),
+        ppcTotalOk: document.getElementById('ppc-total-ok'),
+        ppcTotalNg: document.getElementById('ppc-total-ng'),
+        ppcRateValue: document.getElementById('ppc-rate-value'),
     };
+
+    // =========================================================================
+    // PPC RATE CALCULATION
+    // =========================================================================
+
+    function calculatePPCRate() {
+        let totalOK = 0;
+        let totalNG = 0;
+
+        DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
+            const checkedRadio = tr.querySelector('.status-radio:checked');
+            if (!checkedRadio) return; // Abaikan yang tidak diklik
+            if (checkedRadio.value === 'OK') totalOK++;
+            else if (checkedRadio.value === 'NG') totalNG++;
+        });
+
+        let ppcRate;
+        if (totalNG === 0) {
+            // Jika tidak ada NG, PPC Rate = 100% (semua OK)
+            ppcRate = totalOK > 0 ? '100%' : '—';
+        } else {
+            ppcRate = ((totalOK / totalNG) * 100).toFixed(1) + '%';
+        }
+
+        DOMElements.ppcTotalOk.textContent = totalOK;
+        DOMElements.ppcTotalNg.textContent = totalNG;
+        DOMElements.ppcRateValue.textContent = ppcRate;
+
+        return { totalOK, totalNG, ppcRate };
+    }
+
+    function getPPCRateForExport(pairs) {
+        let totalOK = 0;
+        let totalNG = 0;
+
+        pairs.forEach(pair => {
+            if (pair.status === 'OK') totalOK++;
+            else if (pair.status === 'NG') totalNG++;
+        });
+
+        let ppcRate;
+        if (totalNG === 0) {
+            ppcRate = totalOK > 0 ? '100%' : '—';
+        } else {
+            ppcRate = ((totalOK / totalNG) * 100).toFixed(1) + '%';
+        }
+
+        return { totalOK, totalNG, ppcRate };
+    }
 
     // =========================================================================
     // 2. FUNGSI AUTO-SAVE & AUTO-RESTORE
@@ -211,7 +263,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 DOMElements.dataEntryBody.querySelectorAll('tr').forEach(tr => {
                     const photos = JSON.parse(tr.dataset.photos || '[]');
                     
-                    // BARU: Ambil status dari radio button
                     const checkedRadio = tr.querySelector('.status-radio:checked');
                     const statusValue = checkedRadio ? checkedRadio.value : '';
                     
@@ -284,7 +335,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 try {
-                    // BARU: Restore status untuk radio button
                     const statusRadios = tr.querySelectorAll('.status-radio');
                     const savedStatus = pairData.status || '';
 
@@ -327,6 +377,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             await Promise.all(restorePromises);
+
+            // Update PPC Rate setelah restore
+            calculatePPCRate();
 
             if (restoredCount > 0) {
                 console.log(`✓ Successfully restored ${restoredCount} pairs (dengan foto!)`);
@@ -568,7 +621,6 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleTableChange(e) {
         const target = e.target;
 
-        // BARU: Handle radio button status
         if (target.classList.contains('status-radio')) {
             const tr = target.closest('tr');
             const addPhotoButton = tr.querySelector('.add-photo-btn');
@@ -594,6 +646,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 resetDefectsForRow(tr);
                 resetPhotosForRow(tr);
             }
+
+            // Update PPC Rate setiap kali status berubah
+            calculatePPCRate();
             
             saveDraftToLocalStorage(true);
         }
@@ -625,7 +680,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 confirmText: 'Ya, Hapus',
                 onConfirm: () => { 
                     resetRow(tr); 
-                    hideModal(); 
+                    hideModal();
+                    calculatePPCRate();
                     saveDraftToLocalStorage(true);
                 }
             });
@@ -736,7 +792,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function resetRow(tr) {
-        // BARU: Reset radio button
         const statusRadios = tr.querySelectorAll('.status-radio');
         statusRadios.forEach(radio => {
             radio.checked = false;
@@ -824,7 +879,6 @@ document.addEventListener('DOMContentLoaded', () => {
             },
         });
         
-        // BARU: Auto-focus search bar
         setTimeout(() => {
             const searchBar = document.getElementById('defect-search-input');
             if (searchBar) {
@@ -1007,6 +1061,8 @@ document.addEventListener('DOMContentLoaded', () => {
         DOMElements.model.value = '';
         DOMElements.line.value = '';
         DOMElements.dataEntryBody.querySelectorAll('tr').forEach(resetRow);
+        // Reset PPC Rate display
+        calculatePPCRate();
     }
     
     async function handleSavedFilesActions(e) {
@@ -1212,12 +1268,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const totalDefects = Object.values(defectCounts).reduce((a, b) => a + b, 0);
 
+        // Hitung PPC Rate untuk export
+        const { totalOK, totalNG, ppcRate } = getPPCRateForExport(fileData.pairs);
+
         const headers = [
             'Date',
             'Style Number',
             'Model',
             ...defectList,
-            'Total Defect'
+            'Total Defect',
+            'Total OK',
+            'Total NG',
+            'PPC Rate%'
         ];
 
         const dataRow = [
@@ -1225,7 +1287,10 @@ document.addEventListener('DOMContentLoaded', () => {
             fileData.header.styleNumber,
             fileData.header.model,
             ...defectList.map(defect => defectCounts[defect]),
-            totalDefects
+            totalDefects,
+            totalOK,
+            totalNG,
+            ppcRate
         ];
 
         return [headers, dataRow];
