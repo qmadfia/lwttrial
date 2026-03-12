@@ -205,12 +205,16 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (checkedRadio.value === 'NG') totalNG++;
         });
 
+        const totalOutput = totalOK + totalNG;
+
         let ppcRate;
-        if (totalNG === 0) {
-            // Jika tidak ada NG, PPC Rate = 100% (semua OK)
-            ppcRate = totalOK > 0 ? '100%' : '—';
+        if (totalOutput === 0) {
+            ppcRate = '—';
+        } else if (totalNG === 0) {
+            // Semua OK, tidak ada NG → 100%
+            ppcRate = '100%';
         } else {
-            ppcRate = ((totalOK / totalNG) * 100).toFixed(1) + '%';
+            ppcRate = ((totalOK / totalOutput) * 100).toFixed(2) + '%';
         }
 
         DOMElements.ppcTotalOk.textContent = totalOK;
@@ -229,11 +233,15 @@ document.addEventListener('DOMContentLoaded', () => {
             else if (pair.status === 'NG') totalNG++;
         });
 
+        const totalOutput = totalOK + totalNG;
+
         let ppcRate;
-        if (totalNG === 0) {
-            ppcRate = totalOK > 0 ? '100%' : '—';
+        if (totalOutput === 0) {
+            ppcRate = '—';
+        } else if (totalNG === 0) {
+            ppcRate = '100%';
         } else {
-            ppcRate = ((totalOK / totalNG) * 100).toFixed(1) + '%';
+            ppcRate = ((totalOK / totalOutput) * 100).toFixed(2) + '%';
         }
 
         return { totalOK, totalNG, ppcRate };
